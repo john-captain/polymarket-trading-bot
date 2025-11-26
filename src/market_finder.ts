@@ -103,7 +103,9 @@ export class MarketFinder {
     private parseMarket(marketData: any): Market {
         const tokens: Token[] = [];
 
+        // 尝试从不同的字段获取 token 数据
         if (marketData.tokens && Array.isArray(marketData.tokens)) {
+            // 格式 1: tokens 数组
             for (const token of marketData.tokens) {
                 tokens.push({
                     tokenId: token.token_id || token.tokenId,
@@ -111,26 +113,38 @@ export class MarketFinder {
                     price: token.price ? parseFloat(token.price) : undefined
                 });
             }
-        }
+        } else if (marketData.clobTokenIds && marketData.outcomes) {
+            // 格式 2: clobTokenIds 和 outcomes 分开
+            let tokenIds = marketData.clobTokenIds;
+            let outcomes = marketData.outcomes;
+            let prices = marketData.outcomePrices;
 
-        // 识别 UP 和 DOWN 代币
-        const upToken = tokens.find(t => 
-            t.outcome.toLowerCase().includes('up') || 
-            t.outcome.toLowerCase().includes('yes') ||
-            t.outcome.toLowerCase().includes('higher')
-        );
-        
-        const downToken = tokens.find(t => 
-            t.outcome.toLowerCase().includes('down') || 
-            t.outcome.toLowerCase().includes('no') ||
-            t.outcome.toLowerCase().includes('lower')
-        );
+            // 如果是字符串，解析为数组
+            if (typeof tokenIds === 'string') {
+                tokenIds = JSON.parse(tokenIds);
+            }
+            if (typeof outcomes === 'string') {
+                outcomes = JSON.parse(outcomes);
+            }
+            if (typeof prices === 'string') {
+                prices = JSON.parse(prices);
+            }
+
+            // 组合成 tokens 数组
+            for (let i = 0; i < tokenIds.length; i++) {
+                tokens.push({
+                    tokenId: tokenIds[i],
+                    outcome: outcomes[i],
+                    price: prices && prices[i] ? parseFloat(prices[i]) : undefined
+                });
+            }
+        }
 
         return {
             slug: marketData.slug,
             question: marketData.question,
             conditionId: marketData.condition_id || marketData.conditionId,
-            tokens: [upToken, downToken].filter(Boolean) as Token[],
+            tokens: tokens,
             url: `https://polymarket.com/event/${marketData.slug}`
         };
     }
@@ -185,14 +199,14 @@ export class MarketFinder {
      */
     displayMarket(market: Market): void {
         console.log('='.repeat(60));
-        console.log(`问题: ${market.question}`);
+        console.log(`条件: ${market.question}`);
         console.log(`URL: ${market.url}`);
-        console.log(`条件 ID: ${market.conditionId}`);
+        console.log(`Condition ID: ${market.conditionId}`);
         console.log('-'.repeat(60));
         
         for (const token of market.tokens) {
             console.log(`${token.outcome}:`);
-            console.log(`  代币 ID: ${token.tokenId}`);
+            console.log(`  Token ID: ${token.tokenId}`);
             if (token.price) {
                 console.log(`  价格: $${token.price.toFixed(4)} (${(token.price * 100).toFixed(1)}%)`);
             }
@@ -213,6 +227,11 @@ if (require.main === module) {
             
             if (market) {
                 console.log('\n📊 市场详情加载成功！');
+                console.log('\n💡 使用以下 Token ID 查看价格:');
+                for (const token of market.tokens) {
+                    console.log(`\n${token.outcome}:`);
+                    console.log(`npm run bid-ask ${token.tokenId}`);
+                }
             }
             
         } catch (error) {

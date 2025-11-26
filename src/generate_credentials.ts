@@ -139,8 +139,12 @@ async function checkExistingCredentials() {
         console.log('\n📄 找到现有凭证文件:');
         const creds = JSON.parse(fs.readFileSync(credsFile, 'utf-8'));
         console.log(`   地址: ${creds.address}`);
-        console.log(`   API Key: ${creds.apiKey.substring(0, 20)}...`);
-        console.log(`   生成时间: ${new Date(creds.generatedAt).toLocaleString()}`);
+        if (creds.apiKey) {
+            console.log(`   API Key: ${creds.apiKey.substring(0, 20)}...`);
+        }
+        if (creds.generatedAt) {
+            console.log(`   生成时间: ${new Date(creds.generatedAt).toLocaleString()}`);
+        }
         return true;
     }
     return false;

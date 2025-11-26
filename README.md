@@ -82,13 +82,16 @@ npm run dev
 # 检查凭证
 npm run credentials
 
+# 检查钱包余额
+npm run check-balance
+
 # 检查授权额度
 npm run allowance
 
 # 查找当前比特币市场
 npm run market
 
-# 获取买卖价格（需要代币 ID 作为参数）
+# 获取买卖价格（需要Token ID 作为参数）
 npm run bid-ask <token_id>
 
 # 下单（交互式）
@@ -287,3 +290,22 @@ ISC
 
 **免责声明**：使用风险自负。本软件按原样提供，不提供任何保证。始终先用小额测试。
 
+# 检查余额（推荐先运行这个）
+npm run check-balance
+
+# 手动交易模式（交互式 CLI，安全）
+npm run dev
+
+# 自动交易模式（⚠️  会使用真实资金自动下单）
+npm run auto-trade
+
+# 生成凭证
+npm run gen-creds
+
+# 其他工具
+npm run allowance    # 检查 USDC 授权
+npm run bid-ask      # 查看买卖价差
+npm run market       # 市场发现
+
+# 查找当前比特币市场
+npm run market

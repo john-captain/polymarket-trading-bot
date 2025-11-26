@@ -35,7 +35,7 @@
 **市场发现** (`market_finder.ts`)：
 - 自动生成比特币小时市场 slug：`bitcoin-up-or-down-{月份}-{日期}-{时间}-et`
 - 如果基于 slug 的查找失败，则回退到搜索活跃市场
-- 从 Gamma API 响应解析代币 ID（处理多种响应格式）
+- 从 Gamma API 响应解析Token ID（处理多种响应格式）
 
 **订单执行** (`market_order.ts`)：
 - 为市价单添加 1% 价格缓冲（买单 `buyPrice * 1.01`，卖单 `* 0.99`）
@@ -61,7 +61,7 @@
 **Gamma API**（只读市场数据）：
 - 基础 URL：`https://gamma-api.polymarket.com`
 - 用于市场发现，无需身份验证
-- 返回市场 slug、代币 ID、结果
+- 返回市场 slug、Token ID、结果
 
 ## 开发工作流
 
@@ -132,15 +132,15 @@ console.log(`价格: $${price.toFixed(4)}`); // $0.7300
 this.softwarePrices.UP = message.prob_up / 100.0; // 75 → 0.75
 ```
 
-### 3. 代币 ID 格式
+### 3. Token ID 格式
 
-代币 ID 是**长数字字符串**（不是十六进制地址）：
+Token ID 是**长数字字符串**（不是十六进制地址）：
 ```typescript
 // 正确：
 tokenId: "74767151816109143033985302396646508973461696862933513382243898574910115069108"
 
 // 错误：
-tokenId: "0x..." // 这是钱包地址，不是代币 ID
+tokenId: "0x..." // 这是钱包地址，不是Token ID
 ```
 
 ### 4. 错误处理模式

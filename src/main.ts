@@ -202,7 +202,7 @@ class PolymarketBot {
      * 获取价格数据
      */
     async getPriceData(): Promise<void> {
-        const tokenId = await this.prompt('输入代币 ID: ');
+        const tokenId = await this.prompt('输入Token ID: ');
         const data = await this.bidAsker.getPriceData(tokenId);
         this.bidAsker.displayPriceInfo(tokenId, data);
     }
@@ -212,7 +212,7 @@ class PolymarketBot {
      */
     async placeMarketOrder(): Promise<void> {
         console.log('\n📝 下市价单');
-        const tokenId = await this.prompt('输入代币 ID: ');
+        const tokenId = await this.prompt('输入Token ID: ');
         const side = await this.prompt('输入方向 (BUY/SELL): ');
         const amount = await this.prompt('输入金额 (USDC): ');
 
@@ -234,7 +234,7 @@ class PolymarketBot {
      */
     async placeLimitOrder(): Promise<void> {
         console.log('\n📝 下限价单');
-        const tokenId = await this.prompt('输入代币 ID: ');
+        const tokenId = await this.prompt('输入Token ID: ');
         const side = await this.prompt('输入方向 (BUY/SELL): ');
         const price = await this.prompt('输入价格: ');
         const size = await this.prompt('输入份额: ');

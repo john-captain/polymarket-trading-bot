@@ -51,7 +51,7 @@ export class MarketOrderExecutor {
             console.log('='.repeat(50));
             console.log('📝 下市价单');
             console.log('='.repeat(50));
-            console.log(`代币 ID: ${params.tokenId.substring(0, 12)}...`);
+            console.log(`Token ID: ${params.tokenId.substring(0, 12)}...`);
             console.log(`方向: ${params.side}`);
             console.log(`金额: ${params.amount} USDC`);
             
@@ -109,7 +109,7 @@ export class MarketOrderExecutor {
             console.log('='.repeat(50));
             console.log('📝 下限价单');
             console.log('='.repeat(50));
-            console.log(`代币 ID: ${tokenId.substring(0, 12)}...`);
+            console.log(`Token ID: ${tokenId.substring(0, 12)}...`);
             console.log(`方向: ${side}`);
             console.log(`价格: $${price.toFixed(4)}`);
             console.log(`份额: ${size.toFixed(2)} 份`);
