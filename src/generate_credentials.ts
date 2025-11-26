@@ -1,10 +1,10 @@
 /**
- * Generate CLOB API Credentials for Polymarket
+ * 为 Polymarket 生成 CLOB API 凭证
  * 
- * This script shows you how to:
- * 1. Create a wallet from your private key
- * 2. Generate or derive API credentials
- * 3. Use those credentials for authenticated API calls
+ * 此脚本展示如何:
+ * 1. 从私钥创建钱包
+ * 2. 生成或派生 API 凭证
+ * 3. 使用这些凭证进行认证 API 调用
  */
 
 import { ClobClient } from '@polymarket/clob-client';
@@ -13,61 +13,61 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Load .env file from project root
+// 从项目根目录加载 .env 文件
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 async function generateCredentials() {
     console.log('='.repeat(70));
-    console.log('🔑 Polymarket CLOB Credentials Generator');
+    console.log('🔑 Polymarket CLOB 凭证生成器');
     console.log('='.repeat(70));
     
-    // Step 1: Get private key
+    // 步骤 1: 获取私钥
     const privateKey = process.env.PRIVATE_KEY;
     
     if (!privateKey || privateKey === 'your_private_key_here') {
-        console.log('\n❌ Error: No private key found!');
-        console.log('\n📝 Please add your private key to the .env file:');
+        console.log('\n❌ 错误: 未找到私钥！');
+        console.log('\n📝 请将您的私钥添加到 .env 文件中:');
         console.log('   PRIVATE_KEY=0xYourPrivateKeyHere');
-        console.log('\n💡 Where to find your private key:');
-        console.log('   - MetaMask: Account Details > Export Private Key');
-        console.log('   - Hardware Wallet: Cannot export (use browser connection)');
-        console.log('   - Magic/Email Wallet: https://reveal.magic.link/polymarket');
+        console.log('\n💡 如何找到您的私钥:');
+        console.log('   - MetaMask: 账户详情 > 导出私钥');
+        console.log('   - 硬件钱包: 无法导出 (请使用浏览器连接)');
+        console.log('   - Magic/邮箱钱包: https://reveal.magic.link/polymarket');
         process.exit(1);
     }
     
-    // Step 2: Create wallet from private key
-    console.log('\n📍 Step 1: Creating Wallet...');
+    // 步骤 2: 从私钥创建钱包
+    console.log('\n📍 步骤 1: 创建钱包...');
     const wallet = new Wallet(privateKey);
-    console.log(`✅ Wallet Address: ${wallet.address}`);
+    console.log(`✅ 钱包地址: ${wallet.address}`);
     
-    // Step 3: Initialize CLOB client
-    console.log('\n📍 Step 2: Connecting to Polymarket CLOB...');
+    // 步骤 3: 初始化 CLOB 客户端
+    console.log('\n📍 步骤 2: 连接到 Polymarket CLOB...');
     const host = 'https://clob.polymarket.com';
-    const chainId = 137; // Polygon mainnet
+    const chainId = 137; // Polygon 主网
     
     const client = new ClobClient(host, chainId, wallet);
-    console.log('✅ Connected to CLOB API');
+    console.log('✅ 已连接到 CLOB API');
     
-    // Step 4: Create or derive API credentials
-    console.log('\n📍 Step 3: Generating API Credentials...');
-    console.log('   (This will sign a message with your wallet)');
+    // 步骤 4: 创建或派生 API 凭证
+    console.log('\n📍 步骤 3: 生成 API 凭证...');
+    console.log('   (这将使用您的钱包签名一条消息)');
     
     try {
-        // This will either:
-        // - Derive existing credentials if you've used this wallet before
-        // - Create new credentials if this is a new wallet
+        // 这将会:
+        // - 如果您之前使用过此钱包，则派生现有凭证
+        // - 如果这是新钱包，则创建新凭证
         const creds = await client.createOrDeriveApiKey();
         
-        console.log('\n✅ API Credentials Generated Successfully!');
+        console.log('\n✅ API 凭证生成成功！');
         console.log('='.repeat(70));
-        console.log('📋 Your CLOB API Credentials:');
+        console.log('📋 您的 CLOB API 凭证:');
         console.log('='.repeat(70));
         console.log(`API Key:        ${creds.key}`);
         console.log(`API Secret:     ${creds.secret}`);
         console.log(`API Passphrase: ${creds.passphrase}`);
         console.log('='.repeat(70));
         
-        // Step 5: Save credentials to file
+        // 步骤 5: 保存凭证到文件
         const credsFile = path.join(__dirname, '..', '.credentials.json');
         const credsData = {
             address: wallet.address,
@@ -78,82 +78,82 @@ async function generateCredentials() {
         };
         
         fs.writeFileSync(credsFile, JSON.stringify(credsData, null, 2));
-        console.log(`\n💾 Credentials saved to: .credentials.json`);
+        console.log(`\n💾 凭证已保存到: .credentials.json`);
         
-        // Step 6: Test the credentials by creating a new client with them
-        console.log('\n📍 Step 4: Testing Credentials...');
+        // 步骤 6: 通过创建新客户端测试凭证
+        console.log('\n📍 步骤 4: 测试凭证...');
         
-        // Create a new authenticated client
+        // 创建一个新的已认证客户端
         const authClient = new ClobClient(host, chainId, wallet, creds);
         
-        // Try to get server time
+        // 尝试获取服务器时间
         const serverTime = await authClient.getServerTime();
-        console.log(`✅ Authentication successful! Server time: ${new Date(serverTime).toISOString()}`);
+        console.log(`✅ 认证成功！服务器时间: ${new Date(serverTime).toISOString()}`);
         
-        // Display usage instructions
+        // 显示使用说明
         console.log('\n' + '='.repeat(70));
-        console.log('📖 How to Use These Credentials:');
+        console.log('📖 如何使用这些凭证:');
         console.log('='.repeat(70));
-        console.log('\n1. Using Environment Variables (Recommended):');
-        console.log('   Add these to your .env file:');
+        console.log('\n1. 使用环境变量 (推荐):');
+        console.log('   将以下内容添加到 .env 文件:');
         console.log(`   CLOB_API_KEY=${creds.key}`);
         console.log(`   CLOB_SECRET=${creds.secret}`);
         console.log(`   CLOB_PASS_PHRASE=${creds.passphrase}`);
         
-        console.log('\n2. Using in Code:');
+        console.log('\n2. 在代码中使用:');
         console.log('   ```typescript');
         console.log('   const wallet = new Wallet(privateKey);');
         console.log('   const client = new ClobClient(host, chainId, wallet);');
         console.log('   const creds = await client.createOrDeriveApiKey();');
-        console.log('   // Create authenticated client');
+        console.log('   // 创建已认证客户端');
         console.log('   const authClient = new ClobClient(host, chainId, wallet, creds);');
-        console.log('   // Now you can make authenticated requests');
+        console.log('   // 现在您可以进行认证请求了');
         console.log('   ```');
         
-        console.log('\n3. Important Notes:');
-        console.log('   ⚠️  Keep these credentials SECRET - they control your wallet!');
-        console.log('   ⚠️  The .credentials.json file is in .gitignore (safe)');
-        console.log('   ⚠️  You can regenerate them anytime with this script');
-        console.log('   ✅ These credentials are wallet-specific and deterministic');
-        console.log('   ✅ Running this script again will derive the same credentials');
+        console.log('\n3. 重要说明:');
+        console.log('   ⚠️  请保密这些凭证 - 它们控制您的钱包！');
+        console.log('   ⚠️  .credentials.json 文件已在 .gitignore 中 (安全)');
+        console.log('   ⚠️  您可以随时使用此脚本重新生成凭证');
+        console.log('   ✅ 这些凭证是钱包特定的且确定性的');
+        console.log('   ✅ 再次运行此脚本将派生相同的凭证');
         
         console.log('\n' + '='.repeat(70));
-        console.log('✅ All Done! Your credentials are ready to use.');
+        console.log('✅ 完成！您的凭证已准备好使用。');
         console.log('='.repeat(70));
         
     } catch (error: any) {
-        console.error('\n❌ Error generating credentials:', error.message);
-        console.log('\n💡 Common issues:');
-        console.log('   - Make sure your private key is correct');
-        console.log('   - Check your internet connection');
-        console.log('   - Ensure the wallet has been used on Polymarket before');
+        console.error('\n❌ 生成凭证时出错:', error.message);
+        console.log('\n💡 常见问题:');
+        console.log('   - 确保您的私钥正确');
+        console.log('   - 检查您的互联网连接');
+        console.log('   - 确保该钱包之前在 Polymarket 上使用过');
         process.exit(1);
     }
 }
 
-// Additional utility function to check existing credentials
+// 检查现有凭证的附加实用函数
 async function checkExistingCredentials() {
     const credsFile = path.join(__dirname, '..', '.credentials.json');
     
     if (fs.existsSync(credsFile)) {
-        console.log('\n📄 Found existing credentials file:');
+        console.log('\n📄 找到现有凭证文件:');
         const creds = JSON.parse(fs.readFileSync(credsFile, 'utf-8'));
-        console.log(`   Address: ${creds.address}`);
+        console.log(`   地址: ${creds.address}`);
         console.log(`   API Key: ${creds.apiKey.substring(0, 20)}...`);
-        console.log(`   Generated: ${new Date(creds.generatedAt).toLocaleString()}`);
+        console.log(`   生成时间: ${new Date(creds.generatedAt).toLocaleString()}`);
         return true;
     }
     return false;
 }
 
-// Run the script
+// 运行脚本
 if (require.main === module) {
     (async () => {
         try {
             await checkExistingCredentials();
             await generateCredentials();
         } catch (error) {
-            console.error('Fatal error:', error);
+            console.error('致命错误:', error);
             process.exit(1);
         }
     })();

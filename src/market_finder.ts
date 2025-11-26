@@ -1,5 +1,5 @@
 /**
- * Find and auto-detect Polymarket markets
+ * 查找并自动检测 Polymarket 市场
  */
 
 import axios from 'axios';
@@ -29,12 +29,12 @@ export class MarketFinder {
     }
 
     /**
-     * Generate Bitcoin market URL based on current time
+     * 根据当前时间生成比特币市场 URL
      */
     generateBitcoinMarketUrl(): { url: string; slug: string } {
         const now = new Date();
         
-        // Convert to ET (UTC-5 for EST, UTC-4 for EDT)
+        // 转换为东部时间 (UTC-5 为 EST，UTC-4 为 EDT)
         const month = now.getUTCMonth() + 1;
         const isDST = month > 3 && month < 11;
         const etOffset = isDST ? -4 : -5;
@@ -45,7 +45,7 @@ export class MarketFinder {
         const day = etDate.getUTCDate();
         const hour = etDate.getUTCHours();
         
-        // Convert hour to 12-hour format
+        // 将小时转换为12小时制
         let timeStr: string;
         if (hour === 0) {
             timeStr = '12am';
@@ -64,7 +64,7 @@ export class MarketFinder {
     }
 
     /**
-     * Fetch market data by slug
+     * 通过 slug 获取市场数据
      */
     async fetchMarketBySlug(slug: string): Promise<Market | null> {
         try {
@@ -92,13 +92,13 @@ export class MarketFinder {
             return this.parseMarket(market);
             
         } catch (error) {
-            console.error(`❌ Error fetching market:`, error);
+            console.error(`❌ 获取市场时出错:`, error);
             return null;
         }
     }
 
     /**
-     * Parse market data into standard format
+     * 将市场数据解析为标准格式
      */
     private parseMarket(marketData: any): Market {
         const tokens: Token[] = [];
@@ -113,7 +113,7 @@ export class MarketFinder {
             }
         }
 
-        // Identify UP and DOWN tokens
+        // 识别 UP 和 DOWN 代币
         const upToken = tokens.find(t => 
             t.outcome.toLowerCase().includes('up') || 
             t.outcome.toLowerCase().includes('yes') ||
@@ -136,26 +136,26 @@ export class MarketFinder {
     }
 
     /**
-     * Find current Bitcoin market
+     * 查找当前比特币市场
      */
     async findCurrentBitcoinMarket(): Promise<Market | null> {
         const { slug } = this.generateBitcoinMarketUrl();
-        console.log(`🔍 Searching for Bitcoin market: ${slug}`);
+        console.log(`🔍 搜索比特币市场: ${slug}`);
         
         const market = await this.fetchMarketBySlug(slug);
         
         if (market) {
-            console.log('✅ Market found!');
+            console.log('✅ 已找到市场！');
             this.displayMarket(market);
         } else {
-            console.log('❌ Market not found');
+            console.log('❌ 未找到市场');
         }
         
         return market;
     }
 
     /**
-     * Search active markets
+     * 搜索活跃市场
      */
     async searchActiveMarkets(query: string = 'bitcoin'): Promise<Market[]> {
         try {
@@ -175,26 +175,26 @@ export class MarketFinder {
             return filtered.map((m: any) => this.parseMarket(m));
             
         } catch (error) {
-            console.error(`❌ Error searching markets:`, error);
+            console.error(`❌ 搜索市场时出错:`, error);
             return [];
         }
     }
 
     /**
-     * Display market information
+     * 显示市场信息
      */
     displayMarket(market: Market): void {
         console.log('='.repeat(60));
-        console.log(`Question: ${market.question}`);
+        console.log(`问题: ${market.question}`);
         console.log(`URL: ${market.url}`);
-        console.log(`Condition ID: ${market.conditionId}`);
+        console.log(`条件 ID: ${market.conditionId}`);
         console.log('-'.repeat(60));
         
         for (const token of market.tokens) {
             console.log(`${token.outcome}:`);
-            console.log(`  Token ID: ${token.tokenId}`);
+            console.log(`  代币 ID: ${token.tokenId}`);
             if (token.price) {
-                console.log(`  Price: $${token.price.toFixed(4)} (${(token.price * 100).toFixed(1)}%)`);
+                console.log(`  价格: $${token.price.toFixed(4)} (${(token.price * 100).toFixed(1)}%)`);
             }
         }
         
@@ -202,21 +202,21 @@ export class MarketFinder {
     }
 }
 
-// Example usage
+// 示例用法
 if (require.main === module) {
     (async () => {
         try {
             const finder = new MarketFinder();
             
-            // Find current Bitcoin market
+            // 查找当前比特币市场
             const market = await finder.findCurrentBitcoinMarket();
             
             if (market) {
-                console.log('\n📊 Market details loaded successfully!');
+                console.log('\n📊 市场详情加载成功！');
             }
             
         } catch (error) {
-            console.error('Error:', error);
+            console.error('错误:', error);
             process.exit(1);
         }
     })();

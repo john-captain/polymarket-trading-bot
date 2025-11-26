@@ -50,9 +50,9 @@ export class BalanceChecker {
 
     displayBalances(balances: BalanceInfo): void {
         console.log('='.repeat(60));
-        console.log('💰 WALLET BALANCES');
+        console.log('💰 钱包余额');
         console.log('='.repeat(60));
-        console.log(`Address: ${balances.address}`);
+        console.log(`地址: ${balances.address}`);
         console.log(`USDC: $${balances.usdc.toFixed(2)}`);
         console.log(`MATIC: ${balances.matic.toFixed(4)} ($${(balances.matic * 0.5).toFixed(2)} @ $0.50)`);
         console.log('='.repeat(60));
@@ -66,14 +66,14 @@ export class BalanceChecker {
         let sufficient = true;
 
         if (balances.usdc < requiredUsdc) {
-            warnings.push(`❌ Insufficient USDC: $${balances.usdc.toFixed(2)} (need at least $${requiredUsdc.toFixed(2)})`);
+            warnings.push(`❌ USDC 不足: $${balances.usdc.toFixed(2)} (至少需要 $${requiredUsdc.toFixed(2)})`);
             sufficient = false;
         } else {
             warnings.push(`✅ USDC: $${balances.usdc.toFixed(2)}`);
         }
 
         if (balances.matic < requiredMatic) {
-            warnings.push(`❌ Insufficient MATIC: ${balances.matic.toFixed(4)} (need at least ${requiredMatic.toFixed(4)} for gas)`);
+            warnings.push(`❌ MATIC 不足: ${balances.matic.toFixed(4)} (至少需要 ${requiredMatic.toFixed(4)} 用于 Gas)`);
             sufficient = false;
         } else {
             warnings.push(`✅ MATIC: ${balances.matic.toFixed(4)}`);

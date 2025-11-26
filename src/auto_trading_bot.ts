@@ -3,7 +3,6 @@ import { Wallet } from '@ethersproject/wallet';
 import WebSocket from 'ws';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import { isValidrpc, closeConnection } from 'rpc-validator';
 import { BalanceChecker, BalanceInfo } from './balance_checker';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -63,10 +62,10 @@ class AutoTradingBot {
     constructor() {
         const privateKey = process.env.PRIVATE_KEY;
         if (!privateKey || privateKey.length < 64) {
-            console.error('❌ PRIVATE_KEY not found or invalid in environment variables');
-            console.error('Please add your private key to the .env file:');
+            console.error('❌ 环境变量中未找到 PRIVATE_KEY 或无效');
+            console.error('请将您的私钥添加到 .env 文件中:');
             console.error('PRIVATE_KEY=0xYourPrivateKeyHere');
-            throw new Error('PRIVATE_KEY not found in .env');
+            throw new Error('.env 中未找到 PRIVATE_KEY');
         }
 
         this.wallet = new Wallet(privateKey);
@@ -86,40 +85,35 @@ class AutoTradingBot {
 
     async start() {
         console.log('='.repeat(60));
-        console.log('Starting Auto Trading Bot...');
+        console.log('启动自动交易机器人...');
         console.log('='.repeat(60));
-        console.log(`Wallet: ${this.wallet.address}`);
-        console.log(`Threshold: $${this.priceThreshold.toFixed(4)}`);
-        console.log(`Take Profit: +$${this.takeProfitAmount.toFixed(4)}`);
-        console.log(`Stop Loss: -$${this.stopLossAmount.toFixed(4)}`);
-        console.log(`Trade Amount: $${this.tradeAmount.toFixed(2)}`);
-        console.log(`Cooldown: ${this.tradeCooldown / 1000}s`);
+        console.log(`钱包: ${this.wallet.address}`);
+        console.log(`阈值: $${this.priceThreshold.toFixed(4)}`);
+        console.log(`止盈: +$${this.takeProfitAmount.toFixed(4)}`);
+        console.log(`止损: -$${this.stopLossAmount.toFixed(4)}`);
+        console.log(`交易金额: $${this.tradeAmount.toFixed(2)}`);
+        console.log(`冷却时间: ${this.tradeCooldown / 1000}秒`);
         console.log('='.repeat(60));
-        const isValid = await isValidrpc("https://polygon-rpc.com");
-        if (!isValid) {
-            console.error('❌ RPC is not valid');
-        }
-        console.log('✅ RPC is valid');
-        console.log('\n💰 Checking wallet balances...');
+        console.log('\n💰 正在检查钱包余额...');
         const balances = await this.checkAndDisplayBalances();
         
         const check = this.balanceChecker.checkSufficientBalance(balances, this.tradeAmount, 0.05);
-        console.log('\n📊 Balance Check:');
+        console.log('\n📊 余额检查:');
         check.warnings.forEach(w => console.log(`  ${w}`));
         
         if (!check.sufficient) {
-            console.log('\n❌ Insufficient funds to start trading!');
-            console.log('Please fund your wallet:');
-            console.log(`  - USDC: At least $${this.tradeAmount.toFixed(2)}`);
-            console.log(`  - MATIC: At least 0.05 for gas fees`);
-            throw new Error('Insufficient balance');
+            console.log('\n❌ 资金不足，无法开始交易！');
+            console.log('请为您的钱包充值:');
+            console.log(`  - USDC: 至少 $${this.tradeAmount.toFixed(2)}`);
+            console.log(`  - MATIC: 至少 0.05 用于 Gas 费`);
+            throw new Error('余额不足');
         }
         
-        console.log('\n✅ Balances sufficient!');
+        console.log('\n✅ 余额充足！');
         
         await this.initializeMarket();
         
-        console.log('\n📡 Connecting to data feeds...');
+        console.log('\n📡 正在连接数据源...');
         await this.connectSoftwareWebSocket();
         await this.connectPolymarketWebSocket();
         
@@ -128,8 +122,8 @@ class AutoTradingBot {
         this.isRunning = true;
         this.startMonitoring();
         
-        console.log('\n✅ Bot started successfully!');
-        console.log('Monitoring for trade opportunities...\n');
+        console.log('\n✅ 机器人启动成功！');
+        console.log('正在监控交易机会...\n');
     }
 
     private async checkAndDisplayBalances(): Promise<BalanceInfo> {
@@ -139,7 +133,7 @@ class AutoTradingBot {
     }
 
     private async initializeMarket() {
-        console.log('Finding current Bitcoin market...');
+        console.log('查找当前比特币市场...');
         
         const now = new Date();
         const month = now.toLocaleString('en-US', { month: 'long' }).toLowerCase();
@@ -148,7 +142,7 @@ class AutoTradingBot {
         const timeStr = hour === 0 ? '12am' : hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`;
         const slug = `bitcoin-up-or-down-${month}-${day}-${timeStr}-et`;
         
-        console.log(`Searching for market: ${slug}`);
+        console.log(`搜索市场: ${slug}`);
         
         const response = await fetch(`https://gamma-api.polymarket.com/markets?slug=${slug}`);
         const data: any = await response.json();
@@ -161,7 +155,7 @@ class AutoTradingBot {
         }
         
         if (!market) {
-            console.log('Market not found by slug, searching active markets...');
+            console.log('未通过 slug 找到市场，搜索活跃市场...');
             const activeResponse = await fetch('https://gamma-api.polymarket.com/markets?active=true&limit=50&closed=false');
             const activeData: any = await activeResponse.json();
             const markets = Array.isArray(activeData) ? activeData : (activeData.data || []);
@@ -172,7 +166,7 @@ class AutoTradingBot {
             });
             
             if (!market) {
-                throw new Error('No active Bitcoin market found');
+                throw new Error('未找到活跃的比特币市场');
             }
         }
 
@@ -187,7 +181,7 @@ class AutoTradingBot {
         }
 
         if (tokenIds.length < 2) {
-            throw new Error('Market must have at least 2 tokens');
+            throw new Error('市场必须至少有 2 个代币');
         }
 
         let upIndex = outcomes.findIndex((o: string) => o.toLowerCase().includes('up') || o.toLowerCase().includes('yes'));
@@ -199,9 +193,9 @@ class AutoTradingBot {
         this.tokenIdUp = String(tokenIds[upIndex]);
         this.tokenIdDown = String(tokenIds[downIndex]);
 
-        console.log(`Market found: ${market.question}`);
-        console.log(`UP Token: ${this.tokenIdUp.substring(0, 20)}...`);
-        console.log(`DOWN Token: ${this.tokenIdDown.substring(0, 20)}...`);
+        console.log(`已找到市场: ${market.question}`);
+        console.log(`UP 代币: ${this.tokenIdUp.substring(0, 20)}...`);
+        console.log(`DOWN 代币: ${this.tokenIdDown.substring(0, 20)}...`);
     }
 
     private async connectSoftwareWebSocket() {
@@ -213,7 +207,7 @@ class AutoTradingBot {
             this.softwareWs = new WebSocket(url);
             
             this.softwareWs.on('open', () => {
-                console.log('✅ Software WebSocket connected');
+                console.log('✅ 软件 WebSocket 已连接');
             });
 
             this.softwareWs.on('message', (data) => {
@@ -229,13 +223,13 @@ class AutoTradingBot {
             });
 
             this.softwareWs.on('error', (error) => {
-                console.error('Software WebSocket error:', error.message);
+                console.error('软件 WebSocket 错误:', error.message);
             });
 
             this.softwareWs.on('close', () => {
-                console.log('Software WebSocket closed');
+                console.log('软件 WebSocket 已关闭');
                 if (this.isRunning) {
-                    console.log('Reconnecting in 5 seconds...');
+                    console.log('5秒后重新连接...');
                     setTimeout(connect, 5000);
                 }
             });
@@ -253,7 +247,7 @@ class AutoTradingBot {
             this.polymarketWs = new WebSocket(url);
             
             this.polymarketWs.on('open', () => {
-                console.log('✅ Polymarket WebSocket connected');
+                console.log('✅ Polymarket WebSocket 已连接');
                 
                 const subscribeMessage = {
                     action: 'subscribe',
@@ -276,13 +270,13 @@ class AutoTradingBot {
             });
 
             this.polymarketWs.on('error', (error) => {
-                console.error('Polymarket WebSocket error:', error.message);
+                console.error('Polymarket WebSocket 错误:', error.message);
             });
 
             this.polymarketWs.on('close', () => {
-                console.log('Polymarket WebSocket closed');
+                console.log('Polymarket WebSocket 已关闭');
                 if (this.isRunning) {
-                    console.log('Reconnecting in 5 seconds...');
+                    console.log('5秒后重新连接...');
                     setTimeout(connect, 5000);
                 }
             });
@@ -329,12 +323,12 @@ class AutoTradingBot {
             const now = Date.now();
             
             if (now - this.lastBalanceCheck >= this.balanceCheckInterval) {
-                console.log('\n💰 Periodic balance check...');
+                console.log('\n💰 定期余额检查...');
                 const balances = await this.checkAndDisplayBalances();
                 const check = this.balanceChecker.checkSufficientBalance(balances, this.tradeAmount, 0.02);
                 
                 if (!check.sufficient) {
-                    console.log('⚠️  WARNING: Low balance detected!');
+                    console.log('⚠️  警告: 检测到余额不足！');
                     check.warnings.forEach(w => console.log(`  ${w}`));
                 }
                 
@@ -348,19 +342,19 @@ class AutoTradingBot {
                 const upMarket = (this.polymarketPrices.get(this.tokenIdUp!) || 0).toFixed(4);
                 const downMarket = (this.polymarketPrices.get(this.tokenIdDown!) || 0).toFixed(4);
                 
-                console.log(`[Monitor] Software: UP=$${upSoft} DOWN=$${downSoft} | Market: UP=$${upMarket} DOWN=$${downMarket}`);
+                console.log(`[监控] 软件价格: UP=$${upSoft} DOWN=$${downSoft} | 市场价格: UP=$${upMarket} DOWN=$${downMarket}`);
                 lastLogTime = now;
             }
 
             const opportunity = this.checkTradeOpportunity();
             if (opportunity) {
                 console.log('\n' + '='.repeat(60));
-                console.log('🎯 TRADE OPPORTUNITY DETECTED!');
+                console.log('🎯 检测到交易机会！');
                 console.log('='.repeat(60));
-                console.log(`Token: ${opportunity.tokenType}`);
-                console.log(`Software Price: $${opportunity.softwarePrice.toFixed(4)}`);
-                console.log(`Polymarket Price: $${opportunity.polymarketPrice.toFixed(4)}`);
-                console.log(`Difference: $${opportunity.difference.toFixed(4)} (threshold: $${this.priceThreshold.toFixed(4)})`);
+                console.log(`代币: ${opportunity.tokenType}`);
+                console.log(`软件价格: $${opportunity.softwarePrice.toFixed(4)}`);
+                console.log(`Polymarket 价格: $${opportunity.polymarketPrice.toFixed(4)}`);
+                console.log(`差价: $${opportunity.difference.toFixed(4)} (阈值: $${this.priceThreshold.toFixed(4)})`);
                 console.log('='.repeat(60));
                 
                 await this.executeTrade(opportunity);
@@ -400,15 +394,15 @@ class AutoTradingBot {
     }
 
     private async executeTrade(opportunity: TradeOpportunity) {
-        console.log('\n📊 Executing trade...');
+        console.log('\n📊 执行交易...');
         this.lastTradeTime = Date.now();
 
         try {
             const buyPrice = opportunity.polymarketPrice;
             const shares = this.tradeAmount / buyPrice;
 
-            console.log(`💰 Buying ${shares.toFixed(4)} shares at $${buyPrice.toFixed(4)}`);
-            console.log(`⏳ Placing orders...`);
+            console.log(`💰 以 $${buyPrice.toFixed(4)} 买入 ${shares.toFixed(4)} 份额`);
+            console.log(`⏳ 正在下单...`);
 
             const buyResult = await this.client.createAndPostOrder(
                 {
@@ -421,13 +415,13 @@ class AutoTradingBot {
                 OrderType.GTC
             );
 
-            console.log(`✅ Buy order placed: ${buyResult.orderID}`);
+            console.log(`✅ 买入订单已下达: ${buyResult.orderID}`);
 
             const actualBuyPrice = buyPrice;
             const takeProfitPrice = Math.min(actualBuyPrice + this.takeProfitAmount, 0.99);
             const stopLossPrice = Math.max(actualBuyPrice - this.stopLossAmount, 0.01);
 
-            console.log(`⏳ Waiting 2 seconds for position to settle...`);
+            console.log(`⏳ 等待 2 秒让持仓稳定...`);
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             const takeProfitResult = await this.client.createAndPostOrder(
@@ -452,8 +446,8 @@ class AutoTradingBot {
                 OrderType.GTC
             );
 
-            console.log(`✅ Take Profit order: ${takeProfitResult.orderID} @ $${takeProfitPrice.toFixed(4)}`);
-            console.log(`✅ Stop Loss order: ${stopLossResult.orderID} @ $${stopLossPrice.toFixed(4)}`);
+            console.log(`✅ 止盈订单: ${takeProfitResult.orderID} @ $${takeProfitPrice.toFixed(4)}`);
+            console.log(`✅ 止损订单: ${stopLossResult.orderID} @ $${stopLossPrice.toFixed(4)}`);
 
             const trade: Trade = {
                 tokenType: opportunity.tokenType,
@@ -472,15 +466,15 @@ class AutoTradingBot {
             this.activeTrades.push(trade);
             
             console.log('='.repeat(60));
-            console.log('✅ TRADE EXECUTION COMPLETE!');
-            console.log(`Total trades: ${this.activeTrades.length}`);
+            console.log('✅ 交易执行完成！');
+            console.log(`总交易数: ${this.activeTrades.length}`);
             console.log('='.repeat(60));
-            console.log(`⏰ Next trade available in ${this.tradeCooldown / 1000} seconds\n`);
+            console.log(`⏰ 下次可交易时间: ${this.tradeCooldown / 1000} 秒后\n`);
 
         } catch (error: any) {
             console.error('='.repeat(60));
-            console.error('❌ TRADE EXECUTION FAILED!');
-            console.error(`Error: ${error.message}`);
+            console.error('❌ 交易执行失败！');
+            console.error(`错误: ${error.message}`);
             console.error('='.repeat(60));
         }
     }
@@ -489,7 +483,7 @@ class AutoTradingBot {
         this.isRunning = false;
         this.softwareWs?.close();
         this.polymarketWs?.close();
-        console.log('Bot stopped');
+        console.log('机器人已停止');
     }
 }
 
@@ -497,7 +491,7 @@ async function main() {
     const bot = new AutoTradingBot();
     
     process.on('SIGINT', () => {
-        console.log('\nShutting down...');
+        console.log('\n正在关闭...');
         bot.stop();
         process.exit(0);
     });

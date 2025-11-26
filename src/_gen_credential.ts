@@ -1,5 +1,5 @@
 /**
- * Generate and manage Polymarket CLOB client credentials
+ * 生成和管理 Polymarket CLOB 客户端凭证
  */
 
 import { ethers } from 'ethers';
@@ -15,7 +15,7 @@ export class CredentialGenerator {
         const key = privateKey || process.env.PRIVATE_KEY;
         
         if (!key) {
-            throw new Error('Private key not provided');
+            throw new Error('未提供私钥');
         }
 
         this.wallet = new ethers.Wallet(key);
@@ -23,28 +23,28 @@ export class CredentialGenerator {
     }
 
     /**
-     * Get wallet address
+     * 获取钱包地址
      */
     getAddress(): string {
         return this.wallet.address;
     }
 
     /**
-     * Get private key
+     * 获取私钥
      */
     getPrivateKey(): string {
         return this.wallet.privateKey;
     }
 
     /**
-     * Sign a message
+     * 签名消息
      */
     async signMessage(message: string): Promise<string> {
         return await this.wallet.signMessage(message);
     }
 
     /**
-     * Generate credentials for CLOB API
+     * 为 CLOB API 生成凭证
      */
     async generateApiCredentials(): Promise<{
         address: string;
@@ -59,36 +59,36 @@ export class CredentialGenerator {
     }
 
     /**
-     * Create API signing key
+     * 创建 API 签名密钥
      */
     async createApiKey(nonce: string): Promise<string> {
-        const message = `Sign this message to authenticate with Polymarket CLOB API.\n\nNonce: ${nonce}`;
+        const message = `签署此消息以通过 Polymarket CLOB API 进行身份验证。\n\nNonce: ${nonce}`;
         return await this.signMessage(message);
     }
 
     /**
-     * Display credentials info (without exposing private key)
+     * 显示凭证信息（不暴露私钥）
      */
     displayInfo(): void {
         console.log('='.repeat(50));
-        console.log('Polymarket Credentials');
+        console.log('Polymarket 凭证');
         console.log('='.repeat(50));
-        console.log(`Address: ${this.wallet.address}`);
-        console.log(`Chain ID: ${this.chainId}`);
-        console.log(`Private Key: ${'*'.repeat(60)} (hidden)`);
+        console.log(`地址: ${this.wallet.address}`);
+        console.log(`链 ID: ${this.chainId}`);
+        console.log(`私钥: ${'*'.repeat(60)} (已隐藏)`);
         console.log('='.repeat(50));
     }
 }
 
-// Example usage
+// 示例用法
 if (require.main === module) {
     try {
         const generator = new CredentialGenerator();
         generator.displayInfo();
         
-        console.log('\n✅ Credentials loaded successfully!');
+        console.log('\n✅ 凭证加载成功！');
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ 错误:', error);
         process.exit(1);
     }
 }

@@ -1,5 +1,5 @@
 /**
- * Get best bid and ask prices from order book
+ * 从订单簿获取最佳买价和卖价
  */
 
 import { ClobClient } from '@polymarket/clob-client';
@@ -19,7 +19,7 @@ export class BidAsker {
     private client: ClobClient;
 
     constructor(privateKey?: string, host?: string, chainId?: number) {
-        // For read-only operations, we can use a dummy wallet
+        // 对于只读操作，我们可以使用一个虚拟钱包
         const key = privateKey || process.env.PRIVATE_KEY || '0x' + '1'.repeat(64);
         const apiHost = host || process.env.CLOB_API_URL || 'https://clob.polymarket.com';
         const chain = chainId || parseInt(process.env.POLYGON_CHAIN_ID || '137');
@@ -29,20 +29,20 @@ export class BidAsker {
     }
 
     /**
-     * Get order book for a token
+     * 获取代币的订单簿
      */
     async getOrderBook(tokenId: string): Promise<any> {
         try {
             const orderBook = await this.client.getOrderBook(tokenId);
             return orderBook;
         } catch (error) {
-            console.error(`❌ Error fetching order book for ${tokenId}:`, error);
+            console.error(`❌ 获取 ${tokenId} 的订单簿时出错:`, error);
             return null;
         }
     }
 
     /**
-     * Get best bid and ask from order book
+     * 从订单簿获取最佳买价和卖价
      */
     async getBestBidAsk(tokenId: string): Promise<BidAsk> {
         try {
@@ -73,39 +73,39 @@ export class BidAsker {
                 spread
             };
         } catch (error) {
-            console.error(`❌ Error getting bid/ask:`, error);
+            console.error(`❌ 获取买价/卖价时出错:`, error);
             return { bid: null, ask: null, midpoint: null, spread: null };
         }
     }
 
     /**
-     * Get midpoint price
+     * 获取中间价
      */
     async getMidpoint(tokenId: string): Promise<number | null> {
         try {
             const midpoint = await this.client.getMidpoint(tokenId);
             return midpoint ? parseFloat(midpoint) : null;
         } catch (error) {
-            console.error(`❌ Error fetching midpoint:`, error);
+            console.error(`❌ 获取中间价时出错:`, error);
             return null;
         }
     }
 
     /**
-     * Get last trade price
+     * 获取最后交易价格
      */
     async getLastTradePrice(tokenId: string): Promise<number | null> {
         try {
             const lastPrice = await this.client.getLastTradePrice(tokenId);
             return lastPrice ? parseFloat(lastPrice) : null;
         } catch (error) {
-            console.error(`❌ Error fetching last trade price:`, error);
+            console.error(`❌ 获取最后交易价格时出错:`, error);
             return null;
         }
     }
 
     /**
-     * Get comprehensive price data
+     * 获取综合价格数据
      */
     async getPriceData(tokenId: string): Promise<{
         bidAsk: BidAsk;
@@ -122,41 +122,41 @@ export class BidAsker {
     }
 
     /**
-     * Display price information
+     * 显示价格信息
      */
     displayPriceInfo(tokenId: string, data: any): void {
         console.log('='.repeat(50));
-        console.log(`Token: ${tokenId.substring(0, 12)}...`);
+        console.log(`代币: ${tokenId.substring(0, 12)}...`);
         console.log('='.repeat(50));
         
         if (data.bidAsk.bid !== null) {
-            console.log(`📉 Best Bid:    $${data.bidAsk.bid.toFixed(4)}`);
+            console.log(`📉 最佳买价:    $${data.bidAsk.bid.toFixed(4)}`);
         }
         if (data.bidAsk.ask !== null) {
-            console.log(`📈 Best Ask:    $${data.bidAsk.ask.toFixed(4)}`);
+            console.log(`📈 最佳卖价:    $${data.bidAsk.ask.toFixed(4)}`);
         }
         if (data.bidAsk.midpoint !== null) {
-            console.log(`💰 Midpoint:    $${data.bidAsk.midpoint.toFixed(4)}`);
+            console.log(`💰 中间价:      $${data.bidAsk.midpoint.toFixed(4)}`);
         }
         if (data.bidAsk.spread !== null) {
-            console.log(`📊 Spread:      $${data.bidAsk.spread.toFixed(4)} (${(data.bidAsk.spread * 100).toFixed(2)}%)`);
+            console.log(`📊 价差:        $${data.bidAsk.spread.toFixed(4)} (${(data.bidAsk.spread * 100).toFixed(2)}%)`);
         }
         if (data.lastTrade !== null) {
-            console.log(`🔄 Last Trade:  $${data.lastTrade.toFixed(4)}`);
+            console.log(`🔄 最后交易:    $${data.lastTrade.toFixed(4)}`);
         }
         
         console.log('='.repeat(50));
     }
 }
 
-// Example usage
+// 示例用法
 if (require.main === module) {
     (async () => {
         try {
             const tokenId = process.argv[2];
             
             if (!tokenId) {
-                console.log('Usage: ts-node src/bid_asker.ts <token_id>');
+                console.log('用法: ts-node src/bid_asker.ts <token_id>');
                 process.exit(1);
             }
 
@@ -165,7 +165,7 @@ if (require.main === module) {
             bidAsker.displayPriceInfo(tokenId, data);
             
         } catch (error) {
-            console.error('Error:', error);
+            console.error('错误:', error);
             process.exit(1);
         }
     })();

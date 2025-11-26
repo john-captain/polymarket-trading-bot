@@ -1,5 +1,5 @@
 /**
- * Manage token allowances for Polymarket trading
+ * 管理 Polymarket 交易的代币授权额度
  */
 
 import { ClobClient } from '@polymarket/clob-client';
@@ -18,7 +18,7 @@ export class AllowanceManager {
         const chain = chainId || parseInt(process.env.POLYGON_CHAIN_ID || '137');
 
         if (!key) {
-            throw new Error('Private key not provided');
+            throw new Error('未提供私钥');
         }
 
         this.wallet = new Wallet(key);
@@ -26,44 +26,44 @@ export class AllowanceManager {
     }
 
     /**
-     * Check current USDC balance
+     * 检查当前 USDC 余额
      */
     async checkAllowance(): Promise<string> {
         try {
-            console.log(`💰 Wallet Address: ${this.wallet.address}`);
-            console.log('⚠️  Note: Allowance checking requires blockchain RPC connection');
-            console.log('    Use Polymarket UI to check/set allowances if needed');
-            return 'Allowance check requires RPC setup';
+            console.log(`💰 钱包地址: ${this.wallet.address}`);
+            console.log('⚠️  注意: 授权额度检查需要区块链 RPC 连接');
+            console.log('    如需要，请使用 Polymarket UI 检查/设置授权额度');
+            return '授权额度检查需要 RPC 设置';
         } catch (error) {
-            console.error('❌ Error checking allowance:', error);
+            console.error('❌ 检查授权额度出错:', error);
             throw error;
         }
     }
 
     /**
-     * Set token allowance for trading
+     * 设置交易的代币授权额度
      */
     async setAllowance(amount: string): Promise<any> {
         try {
-            console.log(`🔄 Setting allowance to ${amount} USDC...`);
-            console.log('⚠️  Note: Allowance setting requires blockchain RPC connection');
-            console.log('    Use Polymarket UI to set allowances if needed');
-            return 'Allowance setting requires RPC setup';
+            console.log(`🔄 将授权额度设置为 ${amount} USDC...`);
+            console.log('⚠️  注意: 设置授权额度需要区块链 RPC 连接');
+            console.log('    如需要，请使用 Polymarket UI 设置授权额度');
+            return '设置授权额度需要 RPC 设置';
         } catch (error) {
-            console.error('❌ Error setting allowance:', error);
+            console.error('❌ 设置授权额度出错:', error);
             throw error;
         }
     }
 
     /**
-     * Approve maximum allowance for convenience
+     * 为方便起见，批准最大授权额度
      */
     async approveMaxAllowance(): Promise<any> {
-        return await this.setAllowance('Unlimited');
+        return await this.setAllowance('无限制');
     }
 
     /**
-     * Check if allowance is sufficient for trading
+     * 检查授权额度是否足够交易
      */
     async isAllowanceSufficient(requiredAmount: number): Promise<boolean> {
         try {
@@ -76,34 +76,34 @@ export class AllowanceManager {
     }
 
     /**
-     * Ensure sufficient allowance before trading
+     * 确保交易前有足够的授权额度
      */
     async ensureAllowance(minAmount: number = 1000): Promise<void> {
         const isSufficient = await this.isAllowanceSufficient(minAmount);
         
         if (!isSufficient) {
-            console.log(`⚠️  Allowance insufficient. Setting to ${minAmount} USDC...`);
+            console.log(`⚠️  授权额度不足。设置为 ${minAmount} USDC...`);
             await this.setAllowance(minAmount.toString());
         } else {
-            console.log('✅ Allowance is sufficient');
+            console.log('✅ 授权额度充足');
         }
     }
 }
 
-// Example usage
+// 示例用法
 if (require.main === module) {
     (async () => {
         try {
             const manager = new AllowanceManager();
             
-            // Check current allowance
+            // 检查当前授权额度
             await manager.checkAllowance();
             
-            // Optionally set allowance (commented out for safety)
+            // 可选：设置授权额度（为安全起见已注释）
             // await manager.setAllowance('1000');
             
         } catch (error) {
-            console.error('Error:', error);
+            console.error('错误:', error);
             process.exit(1);
         }
     })();

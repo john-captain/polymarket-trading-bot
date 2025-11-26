@@ -1,5 +1,5 @@
 /**
- * Place market orders on Polymarket
+ * 在 Polymarket 上下市价单
  */
 
 import { ClobClient, OrderType, Side } from '@polymarket/clob-client';
@@ -11,7 +11,7 @@ dotenv.config();
 export interface MarketOrderParams {
     tokenId: string;
     side: 'BUY' | 'SELL';
-    amount: number;  // USDC amount
+    amount: number;  // USDC 金额
 }
 
 export class MarketOrderExecutor {
@@ -23,7 +23,7 @@ export class MarketOrderExecutor {
         const chain = chainId || parseInt(process.env.POLYGON_CHAIN_ID || '137');
 
         if (!key) {
-            throw new Error('Private key not provided');
+            throw new Error('未提供私钥');
         }
 
         const wallet = new Wallet(key);
@@ -31,49 +31,49 @@ export class MarketOrderExecutor {
     }
 
     /**
-     * Get current market price for market order estimation
+     * 获取市价单估算的当前市场价格
      */
     async getMarketPrice(tokenId: string, side: 'BUY' | 'SELL'): Promise<number | null> {
         try {
             const price = await this.client.getPrice(tokenId, side);
             return price ? parseFloat(price) : null;
         } catch (error) {
-            console.error(`❌ Error getting market price:`, error);
+            console.error(`❌ 获取市场价格时出错:`, error);
             return null;
         }
     }
 
     /**
-     * Place a market order using createAndPostOrder
+     * 使用 createAndPostOrder 下市价单
      */
     async placeMarketOrder(params: MarketOrderParams): Promise<any> {
         try {
             console.log('='.repeat(50));
-            console.log('📝 Placing Market Order');
+            console.log('📝 下市价单');
             console.log('='.repeat(50));
-            console.log(`Token ID: ${params.tokenId.substring(0, 12)}...`);
-            console.log(`Side: ${params.side}`);
-            console.log(`Amount: ${params.amount} USDC`);
+            console.log(`代币 ID: ${params.tokenId.substring(0, 12)}...`);
+            console.log(`方向: ${params.side}`);
+            console.log(`金额: ${params.amount} USDC`);
             
-            // Get current market price
+            // 获取当前市场价格
             const marketPrice = await this.getMarketPrice(params.tokenId, params.side);
             
             if (!marketPrice) {
-                throw new Error('Could not get market price');
+                throw new Error('无法获取市场价格');
             }
 
-            console.log(`Market Price: $${marketPrice.toFixed(4)}`);
+            console.log(`市场价格: $${marketPrice.toFixed(4)}`);
             
-            // Calculate size (shares to buy)
+            // 计算份额 (要买入的份额)
             const size = params.amount / marketPrice;
-            console.log(`Estimated Shares: ${size.toFixed(2)}`);
+            console.log(`预计份额: ${size.toFixed(2)}`);
             
-            // Place order at market price with slight buffer
-            const bufferMultiplier = params.side === 'BUY' ? 1.01 : 0.99; // 1% buffer
+            // 以市场价格加轻微缓冲下单
+            const bufferMultiplier = params.side === 'BUY' ? 1.01 : 0.99; // 1% 缓冲
             const orderPrice = marketPrice * bufferMultiplier;
             
-            console.log(`Order Price (with buffer): $${orderPrice.toFixed(4)}`);
-            console.log('\n🔄 Submitting order...\n');
+            console.log(`订单价格 (含缓冲): $${orderPrice.toFixed(4)}`);
+            console.log('\n🔄 正在提交订单...\n');
 
             const order = await this.client.createAndPostOrder({
                 tokenID: params.tokenId,
@@ -81,23 +81,23 @@ export class MarketOrderExecutor {
                 size: size,
                 side: params.side === 'BUY' ? Side.BUY : Side.SELL,
             },
-            { tickSize: '0.001', negRisk: false }, // Default tick size
+            { tickSize: '0.001', negRisk: false }, // 默认最小价格单位
             OrderType.GTC);
 
-            console.log('✅ Order placed successfully!');
-            console.log('Order:', order);
+            console.log('✅ 订单下达成功！');
+            console.log('订单:', order);
             console.log('='.repeat(50));
             
             return order;
             
         } catch (error) {
-            console.error('❌ Error placing market order:', error);
+            console.error('❌ 下市价单时出错:', error);
             throw error;
         }
     }
 
     /**
-     * Place a limit order
+     * 下限价单
      */
     async placeLimitOrder(
         tokenId: string,
@@ -107,13 +107,13 @@ export class MarketOrderExecutor {
     ): Promise<any> {
         try {
             console.log('='.repeat(50));
-            console.log('📝 Placing Limit Order');
+            console.log('📝 下限价单');
             console.log('='.repeat(50));
-            console.log(`Token ID: ${tokenId.substring(0, 12)}...`);
-            console.log(`Side: ${side}`);
-            console.log(`Price: $${price.toFixed(4)}`);
-            console.log(`Size: ${size.toFixed(2)} shares`);
-            console.log('\n🔄 Submitting order...\n');
+            console.log(`代币 ID: ${tokenId.substring(0, 12)}...`);
+            console.log(`方向: ${side}`);
+            console.log(`价格: $${price.toFixed(4)}`);
+            console.log(`份额: ${size.toFixed(2)} 份`);
+            console.log('\n🔄 正在提交订单...\n');
 
             const order = await this.client.createAndPostOrder({
                 tokenID: tokenId,
@@ -124,68 +124,68 @@ export class MarketOrderExecutor {
             { tickSize: '0.001', negRisk: false },
             OrderType.GTC);
 
-            console.log('✅ Order placed successfully!');
-            console.log('Order:', order);
+            console.log('✅ 订单下达成功！');
+            console.log('订单:', order);
             console.log('='.repeat(50));
             
             return order;
             
         } catch (error) {
-            console.error('❌ Error placing limit order:', error);
+            console.error('❌ 下限价单时出错:', error);
             throw error;
         }
     }
 
     /**
-     * Cancel an order
+     * 取消订单
      */
     async cancelOrder(orderId: string): Promise<any> {
         try {
-            console.log(`🔄 Cancelling order ${orderId}...`);
+            console.log(`🔄 正在取消订单 ${orderId}...`);
             const result = await this.client.cancelOrder({ orderID: orderId });
-            console.log('✅ Order cancelled successfully!');
+            console.log('✅ 订单取消成功！');
             return result;
         } catch (error) {
-            console.error('❌ Error cancelling order:', error);
+            console.error('❌ 取消订单时出错:', error);
             throw error;
         }
     }
 
     /**
-     * Get order status
+     * 获取订单状态
      */
     async getOrderStatus(orderId: string): Promise<any> {
         try {
             const order = await this.client.getOrder(orderId);
             return order;
         } catch (error) {
-            console.error('❌ Error getting order status:', error);
+            console.error('❌ 获取订单状态时出错:', error);
             throw error;
         }
     }
 
     /**
-     * Get all open orders
+     * 获取所有待处理订单
      */
     async getOpenOrders(): Promise<any[]> {
         try {
             const orders = await this.client.getOpenOrders();
             return orders || [];
         } catch (error) {
-            console.error('❌ Error getting open orders:', error);
+            console.error('❌ 获取待处理订单时出错:', error);
             return [];
         }
     }
 }
 
-// Example usage
+// 示例用法
 if (require.main === module) {
     (async () => {
         try {
             const executor = new MarketOrderExecutor();
             
-            // Example: Place a market buy order
-            // Uncomment to use:
+            // 示例: 下市价买单
+            // 取消注释以使用:
             /*
             await executor.placeMarketOrder({
                 tokenId: 'YOUR_TOKEN_ID',
@@ -194,11 +194,11 @@ if (require.main === module) {
             });
             */
             
-            console.log('Market order executor initialized');
-            console.log('Uncomment code to place orders');
+            console.log('市价单执行器已初始化');
+            console.log('取消注释代码以下单');
             
         } catch (error) {
-            console.error('Error:', error);
+            console.error('错误:', error);
             process.exit(1);
         }
     })();
