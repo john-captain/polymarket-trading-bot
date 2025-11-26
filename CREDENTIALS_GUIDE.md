@@ -1,32 +1,32 @@
-# Polymarket CLOB Credentials Guide
+# Polymarket CLOB 凭证指南
 
-## What are CLOB Credentials?
+## 什么是 CLOB 凭证？
 
-CLOB (Central Limit Order Book) credentials are API keys that allow you to:
-- Place orders on Polymarket
-- Cancel orders
-- View your open orders
-- Access authenticated endpoints
+CLOB（中央限价订单簿）凭证是允许您执行以下操作的 API 密钥：
+- 在 Polymarket 上下单
+- 取消订单
+- 查看您的未结订单
+- 访问需要身份验证的端点
 
-## How to Generate Credentials
+## 如何生成凭证
 
-### Method 1: Using the Automated Script (Recommended)
+### 方法 1：使用自动化脚本（推荐）
 
-1. **Add your private key to `.env`**:
+1. **将您的私钥添加到 `.env`**：
    ```bash
    PRIVATE_KEY=0xYourPrivateKeyHere
    ```
 
-2. **Run the credential generator**:
+2. **运行凭证生成器**：
    ```bash
    npm run gen-creds
    ```
 
-3. **Your credentials will be displayed and saved to `.credentials.json`**
+3. **您的凭证将显示并保存到 `.credentials.json`**
 
-### Method 2: Manual Generation
+### 方法 2：手动生成
 
-If you prefer to generate credentials manually:
+如果您更喜欢手动生成凭证：
 
 ```typescript
 import { ClobClient } from '@polymarket/clob-client';
@@ -35,87 +35,87 @@ import { Wallet } from '@ethersproject/wallet';
 const wallet = new Wallet('0xYourPrivateKey');
 const client = new ClobClient('https://clob.polymarket.com', 137, wallet);
 
-// Generate credentials (signs a message with your wallet)
+// 生成凭证（使用您的钱包签名一条消息）
 const creds = await client.createOrDeriveApiKey();
 
 console.log('API Key:', creds.apiKey);
 console.log('Secret:', creds.secret);
 console.log('Passphrase:', creds.passphrase);
 
-// Use credentials for authenticated requests
+// 使用凭证进行身份验证的请求
 client.setApiCreds(creds);
 ```
 
-## Where to Get Your Private Key
+## 如何获取您的私钥
 
 ### MetaMask
-1. Click on your account
-2. Select "Account Details"
-3. Click "Export Private Key"
-4. Enter your password
-5. Copy the private key (starts with `0x`)
+1. 点击您的账户
+2. 选择"账户详情"
+3. 点击"导出私钥"
+4. 输入您的密码
+5. 复制私钥（以 `0x` 开头）
 
-### Magic/Email Wallet (Polymarket)
-1. Go to https://reveal.magic.link/polymarket
-2. Enter your email
-3. Follow the authentication steps
-4. Copy the revealed private key
+### Magic/Email 钱包（Polymarket）
+1. 访问 https://reveal.magic.link/polymarket
+2. 输入您的电子邮件
+3. 按照身份验证步骤操作
+4. 复制显示的私钥
 
-### Hardware Wallet
-- Hardware wallets (Ledger, Trezor) cannot export private keys
-- Use browser wallet connection instead of this bot
+### 硬件钱包
+- 硬件钱包（Ledger、Trezor）无法导出私钥
+- 请使用浏览器钱包连接而非此机器人
 
-## Understanding the Credentials
+## 理解凭证
 
-### API Key
-- Public identifier for your API access
-- Safe to share with Polymarket API
-- Example: `7c8f3e2a-1b4d-4e9f-a3c2-9d7e6f5a4b3c`
+### API Key（API 密钥）
+- 您的 API 访问的公共标识符
+- 可以安全地与 Polymarket API 共享
+- 示例：`7c8f3e2a-1b4d-4e9f-a3c2-9d7e6f5a4b3c`
 
-### Secret
-- Used to sign API requests
-- **NEVER share this**
-- Used with API Key to authenticate
+### Secret（密钥）
+- 用于签名 API 请求
+- **切勿分享**
+- 与 API 密钥一起用于身份验证
 
-### Passphrase
-- Additional security layer
-- **NEVER share this**
-- Required for all authenticated requests
+### Passphrase（密码短语）
+- 额外的安全层
+- **切勿分享**
+- 所有身份验证请求都需要
 
-## Important Security Notes
+## 重要安全注意事项
 
-⚠️ **CRITICAL SECURITY WARNINGS:**
+⚠️ **关键安全警告：**
 
-1. **Never commit credentials to Git**
-   - The `.env` and `.credentials.json` files are in `.gitignore`
-   - Never share these files publicly
+1. **切勿将凭证提交到 Git**
+   - `.env` 和 `.credentials.json` 文件已在 `.gitignore` 中
+   - 切勿公开分享这些文件
 
-2. **Keep your private key secret**
-   - Anyone with your private key can control your wallet
-   - Never paste it in public channels or unsecured apps
+2. **保护好您的私钥**
+   - 任何拥有您私钥的人都可以控制您的钱包
+   - 切勿在公共频道或不安全的应用程序中粘贴它
 
-3. **Credentials are deterministic**
-   - The same private key always generates the same credentials
-   - You can safely regenerate them anytime
+3. **凭证是确定性的**
+   - 相同的私钥总是生成相同的凭证
+   - 您可以随时安全地重新生成它们
 
-4. **Test with small amounts first**
-   - Before trading large amounts, test with small trades
-   - Verify everything works as expected
+4. **首先使用小额进行测试**
+   - 在交易大额之前，先用小额交易测试
+   - 验证一切按预期工作
 
-## Using Credentials in Your Code
+## 在代码中使用凭证
 
-### Option 1: Automatic Credential Generation (Used by this bot)
+### 选项 1：自动凭证生成（此机器人使用）
 
 ```typescript
 const client = new ClobClient(host, chainId, wallet);
 const creds = await client.createOrDeriveApiKey();
 client.setApiCreds(creds);
 
-// Now you can make authenticated requests
+// 现在您可以进行身份验证的请求
 await client.getOpenOrders();
 ```
 
-### Option 2: Using Saved Credentials
+### 选项 2：使用保存的凭证
 
 ```typescript
 import { ApiKeyCreds } from '@polymarket/clob-client';
@@ -128,74 +128,74 @@ const creds: ApiKeyCreds = {
 
 const client = new ClobClient(host, chainId, wallet, creds);
 
-// Client is now authenticated
+// 客户端现在已通过身份验证
 ```
 
-## Credential Lifecycle
+## 凭证生命周期
 
-### Creating New Credentials
+### 创建新凭证
 ```typescript
 const creds = await client.createApiKey();
 ```
 
-### Deriving Existing Credentials
+### 派生现有凭证
 ```typescript
 const creds = await client.deriveApiKey();
 ```
 
-### Create or Derive (Recommended)
+### 创建或派生（推荐）
 ```typescript
-// Will derive if exists, create if new
+// 如果存在则派生，如果是新的则创建
 const creds = await client.createOrDeriveApiKey();
 ```
 
-### Viewing Your API Keys
+### 查看您的 API 密钥
 ```typescript
 const apiKeys = await client.getApiKeys();
 console.log(apiKeys);
 ```
 
-### Deleting API Keys
+### 删除 API 密钥
 ```typescript
 await client.deleteApiKey();
 ```
 
-## Troubleshooting
+## 故障排除
 
-### "Private key not provided"
-- Make sure your `.env` file has `PRIVATE_KEY=0x...`
-- Ensure the private key starts with `0x`
-- Check that the `.env` file is in the project root
+### "未提供私钥"
+- 确保您的 `.env` 文件包含 `PRIVATE_KEY=0x...`
+- 确保私钥以 `0x` 开头
+- 检查 `.env` 文件是否在项目根目录中
 
-### "Failed to generate credentials"
-- Check your internet connection
-- Verify the private key is correct (64 hex characters after `0x`)
-- Ensure you're on Polygon mainnet (chainId: 137)
+### "生成凭证失败"
+- 检查您的互联网连接
+- 验证私钥是否正确（`0x` 后面有 64 个十六进制字符）
+- 确保您在 Polygon 主网上（chainId: 137）
 
-### "Authentication failed"
-- Regenerate credentials with `npm run gen-creds`
-- Make sure you're using the correct credentials for the wallet
-- Check that credentials haven't been deleted on the server
+### "身份验证失败"
+- 使用 `npm run gen-creds` 重新生成凭证
+- 确保您使用的是该钱包的正确凭证
+- 检查凭证是否未在服务器上被删除
 
-## Testing Your Credentials
+## 测试您的凭证
 
-After generating credentials, you can test them:
+生成凭证后，您可以测试它们：
 
 ```bash
-# Run the main bot (will use credentials automatically)
+# 运行主机器人（将自动使用凭证）
 npm run dev
 
-# Check specific functionality
-npm run allowance  # Check USDC allowance
-npm run market     # Find current markets
+# 检查特定功能
+npm run allowance  # 检查 USDC 授权额度
+npm run market     # 查找当前市场
 ```
 
-## Advanced: Signature Types
+## 高级：签名类型
 
-When creating the CLOB client, you can specify signature types:
+创建 CLOB 客户端时，您可以指定签名类型：
 
 ```typescript
-const signatureType = 0; // 0: EOA (MetaMask, Hardware), 1: Magic/Email, 2: Proxy
+const signatureType = 0; // 0: EOA (MetaMask, 硬件), 1: Magic/Email, 2: 代理
 
 const client = new ClobClient(
     host,
@@ -203,24 +203,24 @@ const client = new ClobClient(
     wallet,
     creds,
     signatureType,
-    funderAddress  // Optional: for proxy wallets
+    funderAddress  // 可选：用于代理钱包
 );
 ```
 
-- **Type 0**: Standard wallets (MetaMask, private key, hardware)
-- **Type 1**: Email/Magic wallets
-- **Type 2**: Proxy/smart contract wallets
+- **类型 0**：标准钱包（MetaMask、私钥、硬件）
+- **类型 1**：电子邮件/Magic 钱包
+- **类型 2**：代理/智能合约钱包
 
-## Related Files
+## 相关文件
 
-- `src/generate_credentials.ts` - Credential generation script
-- `src/_gen_credential.ts` - Credential manager class
-- `.env.example` - Example environment variables
-- `.credentials.json` - Generated credentials (auto-created, git-ignored)
+- `src/generate_credentials.ts` - 凭证生成脚本
+- `src/_gen_credential.ts` - 凭证管理器类
+- `.env.example` - 环境变量示例
+- `.credentials.json` - 生成的凭证（自动创建，git 忽略）
 
-## Questions?
+## 有问题？
 
-- [Polymarket Documentation](https://docs.polymarket.com)
-- [CLOB API Docs](https://docs.polymarket.com/#clob-api)
-- [GitHub Issues](https://github.com/Polymarket/clob-client)
+- [Polymarket 文档](https://docs.polymarket.com)
+- [CLOB API 文档](https://docs.polymarket.com/#clob-api)
+- [GitHub 问题](https://github.com/Polymarket/clob-client)
 

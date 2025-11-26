@@ -1,341 +1,341 @@
-# Polymarket Auto Trading Bot - The Real Deal
+# Polymarket 自动交易机器人 - 真实情况
 
-So you want to make money on Polymarket while you sleep? Let me show you how this thing actually works.
+想在睡觉时在 Polymarket 上赚钱？让我告诉你这东西实际上是如何工作的。
 
-## What's This All About?
+## 这是关于什么的？
 
-Look, I'll be straight with you. This isn't some magic money printer. It's an arbitrage bot that exploits price differences between what the software thinks a token is worth and what people are actually paying for it on Polymarket.
+听着，我直说。这不是什么神奇的印钞机。这是一个套利机器人，利用软件认为代币价值和人们在 Polymarket 上实际支付价格之间的价格差异。
 
-Think of it like this: You're at a flea market. One guy is selling iPhones for $500 because he doesn't know what they're worth. Another guy down the street is buying them for $700. You buy low, sell high. That's literally all this bot does.
+可以这样想：你在跳蚤市场。一个人以 $500 卖 iPhone，因为他不知道它们的价值。街上另一个人以 $700 买。你低买高卖。这就是这个机器人所做的一切。
 
-## How It Actually Makes Money
+## 它实际上如何赚钱
 
-Every hour, Polymarket has a market for Bitcoin. "Will Bitcoin go UP or DOWN in the next hour?"
+每小时，Polymarket 都有一个比特币市场。"比特币在下一个小时会上涨还是下跌？"
 
-There are two prices:
-1. **What the math says** (software oracle based on actual Bitcoin movement)
-2. **What people are paying** (the market price)
+有两个价格：
+1. **数学计算的价格**（基于实际比特币价格变动的软件预言机）
+2. **人们支付的价格**（市场价格）
 
-When these prices are different enough, there's money to be made.
+当这些价格差异足够大时，就有钱可赚。
 
-### Real Example
+### 真实示例
 
 ```
-11:00 AM Bitcoin price: $98,500
-Period started at: $98,000
+上午 11:00 比特币价格：$98,500
+周期开始于：$98,000
 
-Bitcoin is UP $500, so it's probably going to close UP.
+比特币上涨了 $500，所以它可能会以上涨收盘。
 
-Software calculates: UP token worth $0.75 (75% chance)
-But people on Polymarket are selling it for: $0.70
+软件计算：上涨代币价值 $0.75（75% 概率）
+但 Polymarket 上的人以 $0.70 出售
 
-Your bot sees: "Hey, software says $0.75, market says $0.70"
-Difference: $0.05 (way above the $0.015 threshold)
+你的机器人看到："嘿，软件说 $0.75，市场说 $0.70"
+差额：$0.05（远高于 $0.015 阈值）
 
-What the bot does:
-1. Buys at $0.70 (gets you in cheap)
-2. Sets sell order at $0.71 (locks in profit)
-3. Sets stop loss at $0.695 (protects if things go wrong)
+机器人的操作：
+1. 以 $0.70 买入（低价进入）
+2. 设置卖单为 $0.71（锁定利润）
+3. 设置止损为 $0.695（防止出错）
 
-If it goes up: You make $0.01 per token (about 1.4% in 30 minutes)
-If it goes down: You lose $0.005 per token (stop loss kicks in)
+如果上涨：您每个代币赚 $0.01（约 30 分钟内 1.4%）
+如果下跌：您每个代币亏损 $0.005（止损触发）
 
-Risk/Reward: Risk $0.005 to make $0.01 (2:1 ratio)
+风险/回报：冒险 $0.005 赚取 $0.01（2:1 比率）
 ```
 
-The bot does this automatically. No emotions, no second-guessing, just pure math.
+机器人自动完成这一切。没有情绪，没有犹豫，只有纯粹的数学。
 
-## The Brutal Truth About Returns
+## 关于回报的残酷真相
 
-Let's be real about what you can expect:
+让我们实际看看你能期待什么：
 
-**Starting with $500 capital, $5 trades:**
-- Good day: 10 trades, 7 wins = $0.70 profit
-- Bad day: 10 trades, 4 wins = -$0.30 loss
-- Average: $20-50/month (4-10% monthly return)
+**从 $500 资本开始，$5 交易：**
+- 好的一天：10 笔交易，7 次获胜 = $0.70 利润
+- 坏的一天：10 笔交易，4 次获胜 = -$0.30 损失
+- 平均：每月 $20-50（4-10% 月回报）
 
-**Starting with $5,000 capital, $50 trades:**
-- Good day: 10 trades, 7 wins = $7 profit
-- Bad day: 10 trades, 4 wins = -$3 loss  
-- Average: $200-500/month
+**从 $5,000 资本开始，$50 交易：**
+- 好的一天：10 笔交易，7 次获胜 = $7 利润
+- 坏的一天：10 笔交易，4 次获胜 = -$3 损失
+- 平均：每月 $200-500
 
-Not life-changing money unless you scale up. But it's honest money, and it compounds.
+除非你扩大规模，否则不会改变生活。但这是诚实的钱，而且会复利增长。
 
-## Setting This Thing Up
+## 设置这个东西
 
-### What You Need
+### 你需要什么
 
-1. **Money**: At least $10 USDC on Polygon (recommended: $50-100). Less than that, fees will eat you alive.
-2. **USDC on Polygon Network**: NOT Ethereum. NOT Arbitrum. **POLYGON** (Chain ID: 137)
-   - Contract: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`
-   - Buy on Coinbase/Binance and withdraw to Polygon network
-   - Or bridge from Ethereum (expensive but works)
-3. **MATIC for Gas**: Need ~0.1-0.5 MATIC (~$0.05-0.25) for transaction fees
-   - Each trade costs 0.001-0.01 MATIC
-   - Get it from any exchange that supports Polygon withdrawals
-4. **Wallet**: MetaMask or any Ethereum wallet with a private key
-5. **Balls**: You'll lose trades. That's part of it. Don't trade what you can't afford to lose.
+1. **资金**：Polygon 上至少 $10 USDC（推荐：$50-100）。少于这个数，手续费会吃掉你。
+2. **Polygon 网络上的 USDC**：不是以太坊。不是 Arbitrum。**是 POLYGON**（链 ID：137）
+   - 合约：`0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`
+   - 在 Coinbase/Binance 购买并提现到 Polygon 网络
+   - 或从以太坊跨链（昂贵但有效）
+3. **用于 Gas 的 MATIC**：需要约 0.1-0.5 MATIC（约 $0.05-0.25）用于交易费用
+   - 每笔交易花费 0.001-0.01 MATIC
+   - 从任何支持 Polygon 提现的交易所获取
+4. **钱包**：MetaMask 或任何带有私钥的以太坊钱包
+5. **勇气**：你会失败一些交易。这是其中的一部分。不要交易你承受不起损失的金额。
 
-### Step 1: Get Your Shit Together
+### 步骤 1：准备工作
 
 ```bash
 cd polymarket-ts-bot
 npm install
 ```
 
-### Step 2: Add Your Private Key
+### 步骤 2：添加您的私钥
 
-Open the `.env` file. Yes, that file. Add your private key:
+打开 `.env` 文件。对，就是那个文件。添加您的私钥：
 
 ```
 PRIVATE_KEY=0xYourActualPrivateKeyHere
 ```
 
-**IMPORTANT**: Don't fuck this up. Your private key controls your money. Don't share it, don't commit it to GitHub, don't post it anywhere. Just put it in that file and forget about it.
+**重要**：不要搞砸这个。您的私钥控制着您的资金。不要分享它，不要提交到 GitHub，不要在任何地方发布它。只需将它放入该文件并忘记它。
 
-If you don't know how to get your private key:
-- MetaMask: Click the 3 dots → Account Details → Export Private Key
-- Magic/Email wallet: Go to https://reveal.magic.link/polymarket
+如果您不知道如何获取私钥：
+- MetaMask：点击三个点 → 账户详情 → 导出私钥
+- Magic/Email 钱包：访问 https://reveal.magic.link/polymarket
 
-### Step 3: Generate Your API Keys
+### 步骤 3：生成您的 API 密钥
 
 ```bash
 npm run gen-creds
 ```
 
-This creates API credentials so the bot can actually trade. It'll save them in `.credentials.json`. Keep that file safe too.
+这会创建 API 凭证，以便机器人实际可以交易。它会将它们保存在 `.credentials.json` 中。也要保护好那个文件。
 
-### Step 4: Configure Your Risk (Optional)
+### 步骤 4：配置风险（可选）
 
-The `.env` file has settings you can tweak:
+`.env` 文件有您可以调整的设置：
 
 ```bash
-PRICE_DIFFERENCE_THRESHOLD=0.015    # How big of a gap before trading
-STOP_LOSS_AMOUNT=0.005              # Max loss per trade
-TAKE_PROFIT_AMOUNT=0.01             # Target profit per trade
-DEFAULT_TRADE_AMOUNT=5.0            # USDC per trade
-TRADE_COOLDOWN=30                   # Seconds between trades
+PRICE_DIFFERENCE_THRESHOLD=0.015    # 交易前的价差大小
+STOP_LOSS_AMOUNT=0.005              # 每笔交易的最大损失
+TAKE_PROFIT_AMOUNT=0.01             # 每笔交易的目标利润
+DEFAULT_TRADE_AMOUNT=5.0            # 每笔交易的 USDC
+TRADE_COOLDOWN=30                   # 交易之间的秒数
 ```
 
-**My advice**: Leave these alone for your first week. See how it performs with defaults, then tweak.
+**我的建议**：第一周不要改动这些。看看默认设置的表现如何，然后再调整。
 
-### Step 5: Run The Damn Thing
+### 步骤 5：运行这个东西
 
 ```powershell
 .\start-bot.ps1
 ```
 
-Or if PowerShell gives you shit:
+或者如果 PowerShell 出问题：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File start-bot.ps1
 ```
 
-You'll see something like:
+您将看到类似这样的内容：
 
 ```
 ===========================================================
-Starting Auto Trading Bot...
+启动自动交易机器人...
 ===========================================================
-Wallet: 0xYourAddress...
-Threshold: $0.0150
-Take Profit: +$0.0100
-Stop Loss: -$0.0050
-Trade Amount: $5.00
-Cooldown: 30s
+钱包：0xYourAddress...
+阈值：$0.0150
+止盈：+$0.0100
+止损：-$0.0050
+交易金额：$5.00
+冷却时间：30 秒
 ===========================================================
 
-💰 Checking wallet balances...
+💰 检查钱包余额...
 ===========================================================
-💰 WALLET BALANCES
+💰 钱包余额
 ===========================================================
-Address: 0xYourAddress...
+地址：0xYourAddress...
 USDC: $100.50
 MATIC: 0.5432 ($0.27 @ $0.50)
 ===========================================================
 
-📊 Balance Check:
+📊 余额检查:
   ✅ USDC: $100.50
   ✅ MATIC: 0.5432
 
-✅ Balances sufficient!
+✅ 余额充足！
 
-🔍 Finding current Bitcoin market...
-✅ Found: Bitcoin Up or Down - November 22, 9AM ET
+🔍 查找当前比特币市场...
+✅ 找到：Bitcoin Up or Down - November 22, 9AM ET
 
-📡 Connecting to data feeds...
-✅ Connected to software feed
-✅ Connected to Polymarket feed
+📡 连接数据源...
+✅ 已连接到软件源
+✅ 已连接到 Polymarket 源
 
-✅ Bot started successfully!
-Monitoring for trade opportunities...
+✅ 机器人成功启动！
+监控交易机会...
 ```
 
-If you see "❌ Insufficient USDC" or "❌ Insufficient MATIC", the bot tells you EXACTLY what you need to add.
+如果您看到 "❌ USDC 不足" 或 "❌ MATIC 不足"，机器人会准确告诉您需要添加什么。
 ============================================================
-Starting Auto Trading Bot...
+启动自动交易机器人...
 ============================================================
-Wallet: 0xda2d...b263
-Threshold: $0.0150
-Take Profit: +$0.0100
-Stop Loss: -$0.0050
-Trade Amount: $5.00
-Cooldown: 30s
+钱包：0xda2d...b263
+阈值：$0.0150
+止盈：+$0.0100
+止损：-$0.0050
+交易金额：$5.00
+冷却时间：30 秒
 ============================================================
 
-Market found: Bitcoin Up or Down - November 22, 11AM ET
-✅ Bot started successfully!
-Monitoring for trade opportunities...
+找到市场：Bitcoin Up or Down - November 22, 11AM ET
+✅ 机器人成功启动！
+监控交易机会...
 ```
 
-Now it's running. It'll sit there, watching prices, and when it sees an opportunity, it'll pounce.
+现在它正在运行。它会坐在那里，观察价格，当它看到机会时，就会出手。
 
-## What You'll See When It Trades
+## 交易时您将看到什么
 
 ```
-🎯 TRADE OPPORTUNITY DETECTED!
-Token: UP
-Software Price: $0.7500
-Polymarket Price: $0.7300
-Difference: $0.0200
+🎯 检测到交易机会！
+代币：上涨
+软件价格：$0.7500
+Polymarket 价格：$0.7300
+差额：$0.0200
 
-📊 Executing trade...
-💰 Buying 6.8493 shares at $0.7300
-✅ Buy order placed: abc123...
-✅ Take Profit order: def456... @ $0.7400
-✅ Stop Loss order: ghi789... @ $0.7250
+📊 执行交易...
+💰 以 $0.7300 购买 6.8493 份额
+✅ 买单已下：abc123...
+✅ 止盈单：def456... @ $0.7400
+✅ 止损单：ghi789... @ $0.7250
 
-✅ TRADE EXECUTION COMPLETE!
-⏰ Next trade available in 30 seconds
+✅ 交易执行完成！
+⏰ 30 秒后可进行下一笔交易
 ```
 
-That's it. It bought, set up your profit target, set up your safety net. Now you wait.
+就这样。它买入了，设置了您的利润目标，设置了您的安全网。现在等待。
 
-## How to Know If It's Working
+## 如何知道它是否工作
 
-Every 30 seconds you'll see:
+每 30 秒您会看到：
 
 ```
 [Monitor] Software: UP=$0.7500 DOWN=$0.2500 | Market: UP=$0.7300 DOWN=$0.2700
 ```
 
-If the numbers are moving, it's working. If they're stuck at $0.0000, something's wrong (probably WebSocket connection).
+如果数字在变化，说明它在工作。如果它们卡在 $0.0000，那就有问题了（可能是 WebSocket 连接问题）。
 
-## Common Fuckups
+## 常见错误
 
-### "PRIVATE_KEY not found"
-You didn't add your private key to `.env`. Go back to Step 2.
+### "未找到 PRIVATE_KEY"
+您没有将私钥添加到 `.env`。回到步骤 2。
 
-### "No active Bitcoin market found"
-The current hour's market hasn't started yet. Wait a few minutes. Markets typically open at the top of each hour.
+### "未找到活跃的比特币市场"
+当前小时的市场尚未开始。等几分钟。市场通常在每小时开始时开放。
 
-### "Insufficient balance"
-You don't have enough USDC. Fund your wallet on Polygon network.
+### "余额不足"
+您没有足够的 USDC。在 Polygon 网络上为您的钱包充值。
 
-### Bot keeps reconnecting
-Your internet is shit or the WebSocket server is having issues. It'll keep trying. If it doesn't stabilize in a minute, restart it.
+### 机器人不断重新连接
+您的互联网有问题或 WebSocket 服务器有问题。它会继续尝试。如果一分钟内没有稳定下来，请重启它。
 
-### Prices stuck at $0.0000
-WebSockets aren't connecting. Check your firewall, check your internet. Restart the bot.
+### 价格卡在 $0.0000
+WebSocket 没有连接。检查您的防火墙，检查您的互联网。重启机器人。
 
-## Stopping The Bot
+## 停止机器人
 
-Press `Ctrl+C`. That's it. It'll stop gracefully and close connections.
+按 `Ctrl+C`。就这样。它会优雅地停止并关闭连接。
 
-## Real Talk: Risk Management
+## 真实谈话：风险管理
 
-Here's what separates winners from losers:
+以下是赢家和输家的区别：
 
-### DO:
-- Start with small trades ($5-10)
-- Run it for a week before scaling up
-- Track your win rate (aim for 60%+)
-- Set aside money you're okay losing
-- Let it run during high volatility hours (9AM-2PM ET)
+### 做：
+- 从小额交易开始（$5-10）
+- 在扩大规模前运行一周
+- 跟踪您的胜率（目标 60%+）
+- 留出您可以承受损失的资金
+- 在高波动时段运行（东部时间上午 9 点至下午 2 点）
 
-### DON'T:
-- Bet your rent money
-- Scale up after one good day
-- Panic stop it after a losing trade
-- Manually interfere with running trades
-- Run it 24/7 (hourly markets dry up at night)
+### 不要：
+- 押上房租钱
+- 一天好运后就扩大规模
+- 一次亏损后恐慌停止
+- 手动干预正在运行的交易
+- 24/7 运行（小时市场晚上会枯竭）
 
-## Expected Performance
+## 预期表现
 
-Based on 30 days of backtesting:
+基于 30 天的回测：
 
 ```
-Win Rate: 68%
-Average Win: $0.68
-Average Loss: -$0.32
-Net Profit: $88.76 (on $5 trades)
-Best Day: $8.40
-Worst Day: -$3.20
+胜率：68%
+平均盈利：$0.68
+平均亏损：-$0.32
+净利润：$88.76（$5 交易）
+最好的一天：$8.40
+最差的一天：-$3.20
 ```
 
-**Translation**: It works, but it's not getting you a Lambo. It's beer money that compounds.
+**翻译**：它有效，但不会让您买兰博基尼。这是会复利增长的零花钱。
 
-## When Shit Goes Wrong
+## 当事情出错时
 
-Things will go wrong. Here's how to handle it:
+事情会出错。以下是处理方法：
 
-**Trade stuck?** Check Polymarket UI. Your orders are there. Cancel manually if needed.
+**交易卡住了？** 检查 Polymarket UI。您的订单在那里。如果需要，手动取消。
 
-**Bot crashed?** Just restart it. It doesn't affect existing orders.
+**机器人崩溃了？** 只需重启它。它不影响现有订单。
 
-**Lost money?** Yeah, that'll happen. The stop loss should have capped it at -$0.005 per token. If you lost more, your stop loss didn't fill (low liquidity).
+**亏钱了？** 是的，这会发生。止损应该将其限制在每个代币 -$0.005。如果您损失更多，您的止损没有成交（流动性低）。
 
-**Made money but not showing?** Check your wallet on Polygonscan. The money's there, just not in USDC yet (it's in tokens that filled).
+**赚钱了但没有显示？** 在 Polygonscan 上检查您的钱包。钱在那里，只是还不是 USDC（它在已成交的代币中）。
 
-## Files You Give a Shit About
+## 您需要关心的文件
 
-- `.env` - Your private key and settings (DON'T SHARE)
-- `.credentials.json` - Your API keys (DON'T SHARE)
-- `start-bot.ps1` - The script to start the bot
-- `PROFIT_STRATEGY.md` - Deep dive into the strategy (read this if you're serious)
+- `.env` - 您的私钥和设置（不要分享）
+- `.credentials.json` - 您的 API 密钥（不要分享）
+- `start-bot.ps1` - 启动机器人的脚本
+- `PROFIT_STRATEGY.md` - 策略深度剖析（如果您是认真的，请阅读）
 
-## Scaling Up
+## 扩大规模
 
-After you've run it successfully for a week with $5 trades:
+在您成功运行 $5 交易一周后：
 
-1. Check your win rate. If it's above 60%, you're good.
-2. Double your trade size to $10
-3. Run another week
-4. If still profitable, go to $20
-5. Keep doubling until you hit a size where slippage eats your profits
+1. 检查您的胜率。如果超过 60%，您就很好。
+2. 将交易规模翻倍至 $10
+3. 再运行一周
+4. 如果仍然盈利，增加到 $20
+5. 持续翻倍，直到滑点吃掉您的利润
 
-**Max recommended**: $100 per trade for Bitcoin markets. Above that, you'll move the market and fuck up your own trades.
+**最大推荐**：比特币市场每笔交易 $100。超过这个，您会影响市场并搞砸自己的交易。
 
-## Advanced: Multiple Markets
+## 高级：多个市场
 
-Once you're comfortable, you can run multiple bots on different markets:
-- Bitcoin UP/DOWN (most liquid)
-- Ethereum UP/DOWN (less liquid)
-- Stock index markets (varies)
+一旦您熟悉了，可以在不同市场上运行多个机器人：
+- 比特币 上涨/下跌（流动性最高）
+- 以太坊 上涨/下跌（流动性较低）
+- 股指市场（不同）
 
-Each market has different liquidity. Start with Bitcoin.
+每个市场的流动性不同。从比特币开始。
 
-## Questions? Problems?
+## 有问题？
 
-Hit me up: https://t.me/blategold
+联系我：https://t.me/blategold
 
-I'll help you figure it out. But read this doc first. Don't ask me shit that's already answered here.
+我会帮您解决。但首先阅读此文档。不要问我这里已经回答的问题。
 
-## Final Thoughts
+## 最后的想法
 
-This bot is a tool, not a magic solution. It:
-- Works (proven by backtests and live trading)
-- Makes money (small, consistent amounts)
-- Requires capital (at least $500 to be worthwhile)
-- Isn't passive (you need to monitor it)
+这个机器人是一个工具，不是魔法解决方案。它：
+- 有效（回测和实盘交易证明）
+- 赚钱（小额、持续的金额）
+- 需要资本（至少 $500 才值得）
+- 不是被动的（您需要监控它）
 
-If you're looking to get rich quick, this ain't it. If you want to make 4-10% monthly returns through arbitrage, this is legit.
+如果您想快速致富，这不是。如果您想通过套利获得 4-10% 的月回报，这是合法的。
 
-Now go make some money.
+现在去赚点钱吧。
 
 ---
 
-**Disclaimer**: Trading involves risk. You can lose money. Don't trade with money you need for bills. This is not financial advice. I'm just some guy who coded a bot. You're responsible for your own trades.
+**免责声明**：交易涉及风险。您可能会亏钱。不要用账单钱交易。这不是财务建议。我只是一个编写机器人的人。您对自己的交易负责。
 
-**Contact**: https://t.me/blategold
+**联系方式**：https://t.me/blategold
 

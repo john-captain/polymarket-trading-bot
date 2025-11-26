@@ -1,51 +1,51 @@
-# Polymarket TypeScript Trading Bot
+# Polymarket TypeScript 交易机器人
 
-A professional TypeScript-based trading bot for Polymarket with full credential management, order execution, market analysis, and **automated arbitrage trading** capabilities.
+一个专业的基于 TypeScript 的 Polymarket 交易机器人，具有完整的凭证管理、订单执行、市场分析和**自动化套利交易**功能。
 
-## Features
+## 功能特性
 
-- 🔐 **Credential Management**: Secure private key handling and API authentication
-- 💰 **Allowance Control**: Manage USDC token allowances for trading
-- 📊 **Market Analysis**: Real-time bid/ask spreads and price data
-- 🎯 **Order Execution**: Place market and limit orders
-- 🔍 **Market Discovery**: Auto-detect current Bitcoin markets
-- 📈 **Price Tracking**: Get real-time price updates from order books
-- 🤖 **Auto Trading Bot**: Automated arbitrage trading with risk management
+- 🔐 **凭证管理**：安全的私钥处理和 API 身份验证
+- 💰 **授权额度控制**：管理用于交易的 USDC 代币授权额度
+- 📊 **市场分析**：实时买卖价差和价格数据
+- 🎯 **订单执行**：下市价单和限价单
+- 🔍 **市场发现**：自动检测当前比特币市场
+- 📈 **价格跟踪**：从订单簿获取实时价格更新
+- 🤖 **自动交易机器人**：带风险管理的自动化套利交易
 ![Screenshot](./run.png)
 
 ![Screenshot](./tx.png)
-## Two Modes of Operation
+## 两种操作模式
 
-### 1. Manual Trading (Interactive CLI)
-Use the interactive menu to manually place trades, check prices, and manage your account.
+### 1. 手动交易（交互式 CLI）
+使用交互式菜单手动下单、查看价格和管理您的账户。
 
-### 2. Automated Trading Bot
-Fully automated bot that:
-- Monitors price differences between software oracle and market
-- Executes trades when profitable opportunities detected
-- Automatically sets take profit and stop loss orders
-- Manages risk with configurable parameters
+### 2. 自动化交易机器人
+全自动机器人：
+- 监控软件预言机与市场之间的价格差异
+- 在检测到盈利机会时执行交易
+- 自动设置止盈和止损订单
+- 使用可配置参数管理风险
 
-## Installation
+## 安装
 
 ```bash
-# Install dependencies
+# 安装依赖
 npm install
 
-# Create .env file
-# Edit with your private key and configuration
+# 创建 .env 文件
+# 编辑您的私钥和配置
 ```
 
-## Configuration
+## 配置
 
-Edit `.env` file:
+编辑 `.env` 文件：
 
 ```env
 PRIVATE_KEY=your_private_key_here
 CLOB_API_URL=https://clob.polymarket.com
 POLYGON_CHAIN_ID=137
 
-# Auto Trading Parameters
+# 自动交易参数
 SOFTWARE_WS_URL=ws://45.130.166.119:5001
 PRICE_DIFFERENCE_THRESHOLD=0.015
 STOP_LOSS_AMOUNT=0.005
@@ -54,126 +54,126 @@ DEFAULT_TRADE_AMOUNT=5.0
 TRADE_COOLDOWN=30
 ```
 
-## Usage
+## 使用方法
 
-### Generate CLOB Credentials (First Time Setup)
+### 生成 CLOB 凭证（首次设置）
 
 ```bash
 npm run gen-creds
 ```
 
-### Run Auto Trading Bot
+### 运行自动交易机器人
 
 ```bash
 npm run auto-trade
 ```
 
-This starts the fully automated arbitrage trading bot. See `PROFIT_STRATEGY.md` for detailed explanation of the trading logic.
+这将启动全自动套利交易机器人。查看 `PROFIT_STRATEGY.md` 了解交易逻辑的详细解释。
 
-### Run Manual Interactive Bot
+### 运行手动交互式机器人
 
 ```bash
 npm run dev
 ```
 
-### Individual Scripts
+### 单独脚本
 
 ```bash
-# Check credentials
+# 检查凭证
 npm run credentials
 
-# Check allowance
+# 检查授权额度
 npm run allowance
 
-# Find current Bitcoin market
+# 查找当前比特币市场
 npm run market
 
-# Get bid/ask prices (requires token ID as argument)
+# 获取买卖价格（需要代币 ID 作为参数）
 npm run bid-ask <token_id>
 
-# Place orders (interactive)
+# 下单（交互式）
 npm run order
 ```
 
-### Build for Production
+### 生产环境构建
 
 ```bash
-# Compile TypeScript
+# 编译 TypeScript
 npm run build
 
-# Run compiled version
+# 运行编译后的版本
 npm start
 ```
 
-## Project Structure
+## 项目结构
 
 ```
 polymarket-ts-bot/
 ├── src/
-│   ├── main.ts                  # Interactive CLI trading interface
-│   ├── auto_trading_bot.ts      # Automated arbitrage bot
-│   ├── _gen_credential.ts       # Credential management
-│   ├── allowance.ts             # Token allowance management
-│   ├── bid_asker.ts             # Bid/ask price fetching
-│   ├── market_order.ts          # Order execution
-│   ├── market_finder.ts         # Market discovery
-│   └── generate_credentials.ts  # Credential generation utility
-├── .env                         # Environment variables (private)
-├── .credentials.json            # Generated API credentials
-├── package.json                 # Dependencies and scripts
-├── PROFIT_STRATEGY.md          # Detailed trading strategy guide
-└── CREDENTIALS_GUIDE.md        # How to generate credentials
+│   ├── main.ts                  # 交互式 CLI 交易界面
+│   ├── auto_trading_bot.ts      # 自动化套利机器人
+│   ├── _gen_credential.ts       # 凭证管理
+│   ├── allowance.ts             # 代币授权额度管理
+│   ├── bid_asker.ts             # 买卖价格获取
+│   ├── market_order.ts          # 订单执行
+│   ├── market_finder.ts         # 市场发现
+│   └── generate_credentials.ts  # 凭证生成工具
+├── .env                         # 环境变量（私有）
+├── .credentials.json            # 生成的 API 凭证
+├── package.json                 # 依赖和脚本
+├── PROFIT_STRATEGY.md          # 详细交易策略指南
+└── CREDENTIALS_GUIDE.md        # 如何生成凭证
 ```
 
-## Auto Trading Bot Logic
+## 自动交易机器人逻辑
 
-The automated bot implements a price arbitrage strategy:
+自动化机器人实现价格套利策略：
 
-1. **Price Monitoring**: Compares software oracle prices with Polymarket market prices
-2. **Opportunity Detection**: Triggers trade when price difference exceeds threshold
-3. **Three-Order Execution**:
-   - Market Buy: Buys tokens at current price
-   - Take Profit Limit Sell: Sells when price rises
-   - Stop Loss Limit Sell: Sells when price falls
-4. **Risk Management**: Configurable stop loss and take profit levels
+1. **价格监控**：比较软件预言机价格与 Polymarket 市场价格
+2. **机会检测**：当价格差异超过阈值时触发交易
+3. **三单执行**：
+   - 市价买入：以当前价格购买代币
+   - 限价止盈卖出：当价格上涨时卖出
+   - 限价止损卖出：当价格下跌时卖出
+4. **风险管理**：可配置的止损和止盈水平
 
-**Read `PROFIT_STRATEGY.md` for complete explanation of how the bot makes profit.**
+**阅读 `PROFIT_STRATEGY.md` 了解机器人如何盈利的完整解释。**
 
-## Trading Strategy Overview
+## 交易策略概览
 
-### How It Works
+### 工作原理
 
 ```
-Software Oracle calculates UP token worth: $0.75
-Market selling UP token at: $0.70
-Difference: $0.05 (above $0.015 threshold)
+软件预言机计算上涨代币价值：$0.75
+市场以 $0.70 出售上涨代币
+差额：$0.05（高于 $0.015 阈值）
 
-Bot executes:
-1. BUY @ $0.70 (market order)
-2. SELL @ $0.71 (take profit +$0.01)
-3. SELL @ $0.695 (stop loss -$0.005)
+机器人执行：
+1. 买入 @ $0.70（市价单）
+2. 卖出 @ $0.71（止盈 +$0.01）
+3. 卖出 @ $0.695（止损 -$0.005）
 
-Expected outcome:
-- 70% chance: Take profit hits → +$0.01 profit
-- 30% chance: Stop loss hits → -$0.005 loss
-- Net expectation: Positive
+预期结果：
+- 70% 概率：止盈成交 → +$0.01 利润
+- 30% 概率：止损成交 → -$0.005 损失
+- 净期望：正值
 ```
 
-### Configuration Parameters
+### 配置参数
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| PRICE_DIFFERENCE_THRESHOLD | 0.015 | Minimum price difference to trigger trade |
-| TAKE_PROFIT_AMOUNT | 0.01 | Profit target above buy price |
-| STOP_LOSS_AMOUNT | 0.005 | Maximum loss below buy price |
-| DEFAULT_TRADE_AMOUNT | 5.0 | USDC amount per trade |
-| TRADE_COOLDOWN | 30 | Seconds between trades |
+| 参数 | 默认值 | 描述 |
+|------|--------|------|
+| PRICE_DIFFERENCE_THRESHOLD | 0.015 | 触发交易的最小价格差异 |
+| TAKE_PROFIT_AMOUNT | 0.01 | 高于买入价的利润目标 |
+| STOP_LOSS_AMOUNT | 0.005 | 低于买入价的最大损失 |
+| DEFAULT_TRADE_AMOUNT | 5.0 | 每笔交易的 USDC 金额 |
+| TRADE_COOLDOWN | 30 | 交易之间的秒数 |
 
-## Modules
+## 模块
 
-### 1. Credential Generator (`_gen_credential.ts`)
+### 1. 凭证生成器（`_gen_credential.ts`）
 
-Manages wallet credentials and API authentication.
+管理钱包凭证和 API 身份验证。
 
 ```typescript
 import { CredentialGenerator } from './_gen_credential';
@@ -182,21 +182,21 @@ const generator = new CredentialGenerator();
 generator.displayInfo();
 ```
 
-### 2. Allowance Manager (`allowance.ts`)
+### 2. 授权额度管理器（`allowance.ts`）
 
-Control USDC token allowances for trading.
+控制用于交易的 USDC 代币授权额度。
 
 ```typescript
 import { AllowanceManager } from './allowance';
 
 const manager = new AllowanceManager();
 await manager.checkAllowance();
-await manager.setAllowance('1000'); // Set 1000 USDC allowance
+await manager.setAllowance('1000'); // 设置 1000 USDC 授权额度
 ```
 
-### 3. Bid/Ask Pricer (`bid_asker.ts`)
+### 3. 买卖价格获取器（`bid_asker.ts`）
 
-Get real-time order book data.
+获取实时订单簿数据。
 
 ```typescript
 import { BidAsker } from './bid_asker';
@@ -206,9 +206,9 @@ const data = await bidAsker.getPriceData(tokenId);
 console.log(data.bidAsk.midpoint);
 ```
 
-### 4. Market Order Executor (`market_order.ts`)
+### 4. 市价单执行器（`market_order.ts`）
 
-Place and manage orders.
+下单和管理订单。
 
 ```typescript
 import { MarketOrderExecutor } from './market_order';
@@ -221,69 +221,69 @@ await executor.placeMarketOrder({
 });
 ```
 
-### 5. Market Finder (`market_finder.ts`)
+### 5. 市场查找器（`market_finder.ts`）
 
-Auto-detect and search for markets.
+自动检测和搜索市场。
 
 ```typescript
 import { MarketFinder } from './market_finder';
 
 const finder = new MarketFinder();
 const market = await finder.findCurrentBitcoinMarket();
-console.log(market.tokens); // UP and DOWN tokens
+console.log(market.tokens); // 上涨和下跌代币
 ```
 
-## Safety Features
+## 安全功能
 
-- ✅ Confirmation prompts before placing orders
-- ✅ Price validation and sanity checks
-- ✅ Automatic market price buffers
-- ✅ Private key never exposed in logs
-- ✅ Error handling and recovery
+- ✅ 下单前的确认提示
+- ✅ 价格验证和合理性检查
+- ✅ 自动市场价格缓冲
+- ✅ 私钥从不在日志中暴露
+- ✅ 错误处理和恢复
 
-## Development
+## 开发
 
 ```bash
 start-bot.ps1
 
 ```bash
-# Watch mode (auto-reload)
+# 监视模式（自动重载）
 npm run dev
 
-# Type checking
+# 类型检查
 npx tsc --noEmit
 
-# Lint
+# 代码检查
 npx eslint src/
 ```
 
-## Security Notes
+## 安全注意事项
 
-⚠️ **IMPORTANT:**
-- Never commit your `.env` file
-- Keep your private key secure
-- Test with small amounts first
-- Review all transactions before confirming
+⚠️ **重要：**
+- 切勿提交您的 `.env` 文件
+- 保护好您的私钥
+- 首先使用小额测试
+- 在确认前审查所有交易
 
-## Dependencies
+## 依赖
 
-- `@polymarket/clob-client` - Official Polymarket CLOB client
-- `ethers` - Ethereum wallet and cryptography
-- `axios` - HTTP requests
-- `dotenv` - Environment variable management
-- `typescript` - Type safety and modern JavaScript
+- `@polymarket/clob-client` - 官方 Polymarket CLOB 客户端
+- `ethers` - 以太坊钱包和加密
+- `axios` - HTTP 请求
+- `dotenv` - 环境变量管理
+- `typescript` - 类型安全和现代 JavaScript
 
-## License
+## 许可证
 
 ISC
 
-## Support
+## 支持
 
-For issues or questions, please refer to:
-- [Polymarket Documentation](https://docs.polymarket.com)
-- [CLOB API Documentation](https://docs.polymarket.com/#clob-api)
+如有问题或疑问，请参考：
+- [Polymarket 文档](https://docs.polymarket.com)
+- [CLOB API 文档](https://docs.polymarket.com/#clob-api)
 
 ---
 
-**Disclaimer**: Use at your own risk. This software is provided as-is without warranties. Always test with small amounts first.
+**免责声明**：使用风险自负。本软件按原样提供，不提供任何保证。始终先用小额测试。
 

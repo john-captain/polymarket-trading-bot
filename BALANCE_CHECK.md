@@ -1,68 +1,68 @@
-# Balance Checking Feature
+# 余额检查功能
 
-## What It Does
+## 功能说明
 
-The bot now automatically checks your wallet balances before starting:
-- **USDC Balance**: How much trading capital you have
-- **MATIC Balance**: How much gas you have for transactions
+机器人现在会在启动前自动检查您的钱包余额：
+- **USDC 余额**：您拥有的交易资金
+- **MATIC 余额**：您用于交易的 Gas 费用
 
-## When It Checks
+## 检查时机
 
-1. **At Startup**: Before the bot starts trading
-2. **Every Minute**: While the bot is running (periodic check)
-3. **On Demand**: Run `npm run check-balance` anytime
+1. **启动时**：机器人开始交易前
+2. **每分钟**：机器人运行期间（定期检查）
+3. **按需检查**：随时运行 `npm run check-balance`
 
-## What It Shows
+## 显示内容
 
 ```
 ===========================================================
-💰 WALLET BALANCES
+💰 钱包余额
 ===========================================================
-Address: 0xYourAddress...
+地址: 0xYourAddress...
 USDC: $100.50
 MATIC: 0.5432 ($0.27 @ $0.50)
 ===========================================================
 
-📊 Balance Check:
+📊 余额检查:
   ✅ USDC: $100.50
   ✅ MATIC: 0.5432
 ```
 
-## If You Don't Have Enough
+## 余额不足时
 
-The bot will **NOT** let you start trading and shows exactly what you need:
+机器人将**不会**允许您开始交易，并准确显示您需要的金额：
 
 ```
-❌ Insufficient USDC: $2.35 (need at least $5.00)
-❌ Insufficient MATIC: 0.0123 (need at least 0.05 for gas)
+❌ USDC 不足: $2.35 (至少需要 $5.00)
+❌ MATIC 不足: 0.0123 (至少需要 0.05 用于 Gas 费)
 
-❌ Insufficient funds to start trading!
-Please fund your wallet:
-  - USDC: At least $5.00
-  - MATIC: At least 0.05 for gas fees
+❌ 资金不足，无法开始交易！
+请为您的钱包充值：
+  - USDC: 至少 $5.00
+  - MATIC: 至少 0.05 用于 Gas 费
 ```
 
-## Check Balance Manually
+## 手动检查余额
 
 ```bash
 npm run check-balance
 ```
 
-This shows your current balances without starting the bot.
+这将显示您当前的余额，而无需启动机器人。
 
-## Technical Details
+## 技术细节
 
-- **USDC Contract**: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174` (Polygon)
-- **Network**: Polygon (Chain ID: 137)
+- **USDC 合约**: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174` (Polygon)
+- **网络**: Polygon (链 ID: 137)
 - **RPC**: `https://polygon-rpc.com`
-- **Minimum USDC**: Configurable (default: $5.00)
-- **Minimum MATIC**: 0.05 for gas (recommended: 0.5+)
+- **最低 USDC**: 可配置（默认: $5.00）
+- **最低 MATIC**: 0.05 用于 Gas（推荐: 0.5+）
 
-## Files Changed
+## 修改的文件
 
-- `src/balance_checker.ts` - New balance checking module
-- `src/auto_trading_bot.ts` - Integrated balance checks
-- `src/main.ts` - Added balance check to menu (option 2)
-- `src/check_balance.ts` - Standalone balance checker script
-- `README_REAL.md` - Added USDC/MATIC setup instructions
+- `src/balance_checker.ts` - 新的余额检查模块
+- `src/auto_trading_bot.ts` - 集成余额检查
+- `src/main.ts` - 添加余额检查到菜单（选项 2）
+- `src/check_balance.ts` - 独立的余额检查脚本
+- `README_REAL.md` - 添加了 USDC/MATIC 设置说明
 

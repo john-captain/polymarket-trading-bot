@@ -1,443 +1,443 @@
-# Polymarket Auto Trading Bot - Profit Strategy Guide
+# Polymarket 自动交易机器人 - 盈利策略指南
 
-## Core Concept: Price Arbitrage Between Software Oracle and Market
+## 核心概念：软件预言机与市场之间的价格套利
 
-This bot automatically profits from price differences between a software price oracle and actual Polymarket prices.
+该机器人自动从软件价格预言机和实际 Polymarket 价格之间的价格差异中获利。
 
-## How It Makes Money
+## 如何赚钱
 
-### The Opportunity
+### 机会
 
-Bitcoin prediction markets on Polymarket ask: "Will Bitcoin go UP or DOWN in the next hour?"
+Polymarket 上的比特币预测市场提出问题："比特币在下一个小时会上涨还是下跌？"
 
-Two price sources exist:
-1. **Software Oracle** - Calculates probability based on real Bitcoin price movement
-2. **Polymarket Market** - Where users trade based on their predictions
+存在两个价格来源：
+1. **软件预言机** - 基于实时比特币价格变动计算概率
+2. **Polymarket 市场** - 用户根据他们的预测进行交易
 
-When these diverge significantly, profit opportunities emerge.
+当这两者显著偏离时，盈利机会就会出现。
 
-### Profit Mechanism
-
-```
-Software calculates: 75% chance Bitcoin goes UP
-Polymarket trades at: 70% (people are undervaluing UP)
-
-→ Buy UP tokens at $0.70
-→ Software prediction is more accurate
-→ When Bitcoin goes UP, tokens are worth $1.00
-→ Profit: $0.30 per token (42% gain)
-```
-
-## Trading Strategy
-
-### 1. Price Monitoring
-
-The bot continuously monitors:
-- **Software Prices**: UP and DOWN probabilities from real-time Bitcoin data
-- **Polymarket Prices**: Current market prices from order books
-
-### 2. Opportunity Detection
-
-Trade triggers when:
-```
-Software Price - Polymarket Price >= Threshold
-```
-
-**Default Threshold: $0.015** (1.5 cents)
-
-**Example:**
-```
-Software UP: $0.75
-Polymarket UP: $0.73
-Difference: $0.02 → TRADE TRIGGERED
-```
-
-### 3. Three-Order Execution
-
-When opportunity detected, bot executes **3 orders simultaneously**:
-
-#### Order 1: Market Buy
-- Buys tokens immediately at current market price
-- Secures the position before price moves
-
-#### Order 2: Take Profit Sell (Higher Price)
-- Automatically sells ALL tokens when price rises
-- Default: +$0.01 above buy price
-
-#### Order 3: Stop Loss Sell (Lower Price)
-- Automatically sells ALL tokens if price falls
-- Default: -$0.005 below buy price
-
-### Visual Example
+### 盈利机制
 
 ```
-Software says UP token worth: $0.75
-Market selling UP token at: $0.70
+软件计算：比特币上涨的概率为 75%
+Polymarket 交易价：70%（人们低估了上涨）
 
-BOT ACTIONS:
-1. BUY  @ $0.70 (market order - instant)
-2. SELL @ $0.71 (limit order - take profit)
-3. SELL @ $0.695 (limit order - stop loss)
-
-OUTCOME SCENARIOS:
-✅ Price rises to $0.71+ → Take profit hits → Profit $0.01/token
-❌ Price falls to $0.695 → Stop loss hits → Loss -$0.005/token
+→ 以 $0.70 购买上涨代币
+→ 软件预测更准确
+→ 当比特币上涨时，代币价值 $1.00
+→ 利润：每个代币 $0.30（42% 收益）
 ```
 
-## Profit Calculation
+## 交易策略
 
-### Win Scenario
+### 1. 价格监控
+
+机器人持续监控：
+- **软件价格**：基于实时比特币数据的上涨和下跌概率
+- **Polymarket 价格**：来自订单簿的当前市场价格
+
+### 2. 机会检测
+
+交易触发条件：
 ```
-Buy: 100 tokens @ $0.70 = $70
-Sell: 100 tokens @ $0.71 = $71
-Profit: $1 (1.4% return)
-```
-
-### Loss Scenario
-```
-Buy: 100 tokens @ $0.70 = $70
-Sell: 100 tokens @ $0.695 = $69.50
-Loss: -$0.50 (0.7% loss)
-```
-
-### Risk/Reward Ratio
-- **Potential Gain**: $0.01 per token
-- **Potential Loss**: $0.005 per token
-- **Ratio**: 2:1 (risk $0.005 to gain $0.01)
-
-## Why This Works
-
-### 1. Information Asymmetry
-Software has real-time Bitcoin data and calculates probabilities mathematically. Market participants trade on emotion and incomplete information.
-
-### 2. Speed Advantage
-Bot detects and executes in milliseconds. Human traders take seconds or minutes.
-
-### 3. Consistent Small Wins
-Rather than betting on outcomes, bot profits from price inefficiencies. Multiple small wins compound.
-
-### 4. Automated Risk Management
-Stop loss protects capital. Take profit locks in gains. No emotional decisions.
-
-## Configuration Parameters
-
-### PRICE_DIFFERENCE_THRESHOLD
-```
-Default: 0.015 ($0.015)
-```
-Minimum price difference to trigger trade. Lower = more trades but smaller edge. Higher = fewer trades but bigger edge.
-
-### TAKE_PROFIT_AMOUNT
-```
-Default: 0.01 ($0.01)
-```
-How much profit to target above buy price. This is your profit per token.
-
-### STOP_LOSS_AMOUNT
-```
-Default: 0.005 ($0.005)
-```
-Maximum loss to accept below buy price. This limits downside risk.
-
-### TRADE_COOLDOWN
-```
-Default: 30 seconds
-```
-Minimum time between trades. Prevents overtrading and respects market conditions.
-
-### DEFAULT_TRADE_AMOUNT
-```
-Default: $5.00
-```
-USDC amount to trade each time. Start small, scale up as you gain confidence.
-
-## Real Trading Example
-
-### Market Setup
-```
-Current Bitcoin: $98,500
-Period starts at: $98,000
-Bitcoin needs to: Stay above $98,000 to win UP
-
-Software calculation:
-- Bitcoin +$500 from period open
-- Momentum: Bullish
-- Probability UP wins: 78%
-
-Market price:
-- UP token: $0.73
-- DOWN token: $0.27
+软件价格 - Polymarket 价格 >= 阈值
 ```
 
-### Bot Detects Opportunity
+**默认阈值：$0.015**（1.5 美分）
+
+**示例：**
 ```
-Software UP: $0.78
-Market UP: $0.73
-Difference: $0.05 > Threshold ($0.015) ✅
+软件上涨：$0.75
+Polymarket 上涨：$0.73
+差额：$0.02 → 触发交易
 ```
 
-### Bot Executes
+### 3. 三单执行
+
+当检测到机会时，机器人**同时执行 3 个订单**：
+
+#### 订单 1：市价买入
+- 立即以当前市场价格购买代币
+- 在价格变动前锁定头寸
+
+#### 订单 2：止盈卖出（更高价格）
+- 当价格上涨时自动卖出所有代币
+- 默认：高于买入价 +$0.01
+
+#### 订单 3：止损卖出（更低价格）
+- 如果价格下跌则自动卖出所有代币
+- 默认：低于买入价 -$0.005
+
+### 可视化示例
+
 ```
-1. BUY 6.85 shares @ $0.73 = $5.00
-2. SELL 6.85 shares @ $0.74 (take profit)
-3. SELL 6.85 shares @ $0.725 (stop loss)
+软件认为上涨代币价值：$0.75
+市场以 $0.70 出售上涨代币
+
+机器人操作：
+1. 买入 @ $0.70（市价单 - 立即成交）
+2. 卖出 @ $0.71（限价单 - 止盈）
+3. 卖出 @ $0.695（限价单 - 止损）
+
+结果场景：
+✅ 价格上涨至 $0.71+ → 止盈成交 → 利润 $0.01/代币
+❌ 价格下跌至 $0.695 → 止损成交 → 亏损 -$0.005/代币
 ```
 
-### Outcome 1: Bitcoin Stays Up (85% probability)
-```
-Period closes with Bitcoin at $98,600
-UP token = $1.00
+## 利润计算
 
-Take profit hits at $0.74:
-Sell: 6.85 × $0.74 = $5.07
-Profit: $0.07 (1.4% in ~30 minutes)
+### 盈利场景
 ```
-
-### Outcome 2: Bitcoin Crashes (15% probability)
-```
-Period closes with Bitcoin at $97,800
-DOWN wins, UP = $0.00
-
-Stop loss hit at $0.725:
-Sell: 6.85 × $0.725 = $4.97
-Loss: -$0.03 (0.6% loss)
+买入：100 个代币 @ $0.70 = $70
+卖出：100 个代币 @ $0.71 = $71
+利润：$1（1.4% 回报）
 ```
 
-### Expected Value
+### 亏损场景
+```
+买入：100 个代币 @ $0.70 = $70
+卖出：100 个代币 @ $0.695 = $69.50
+亏损：-$0.50（0.7% 损失）
+```
+
+### 风险/回报比率
+- **潜在收益**：每个代币 $0.01
+- **潜在损失**：每个代币 $0.005
+- **比率**：2:1（冒险 $0.005 以获得 $0.01）
+
+## 为什么有效
+
+### 1. 信息不对称
+软件拥有实时比特币数据并进行数学概率计算。市场参与者基于情绪和不完整信息进行交易。
+
+### 2. 速度优势
+机器人在毫秒内检测和执行。人类交易者需要数秒或数分钟。
+
+### 3. 持续的小额盈利
+与其押注结果，机器人从价格低效中获利。多次小额盈利复利增长。
+
+### 4. 自动化风险管理
+止损保护资本。止盈锁定收益。没有情绪化决策。
+
+## 配置参数
+
+### PRICE_DIFFERENCE_THRESHOLD（价格差异阈值）
+```
+默认值：0.015 ($0.015)
+```
+触发交易的最小价格差异。较低 = 更多交易但较小优势。较高 = 较少交易但更大优势。
+
+### TAKE_PROFIT_AMOUNT（止盈金额）
+```
+默认值：0.01 ($0.01)
+```
+目标利润高于买入价的金额。这是您每个代币的利润。
+
+### STOP_LOSS_AMOUNT（止损金额）
+```
+默认值：0.005 ($0.005)
+```
+低于买入价接受的最大损失。这限制了下行风险。
+
+### TRADE_COOLDOWN（交易冷却时间）
+```
+默认值：30 秒
+```
+交易之间的最短时间。防止过度交易并尊重市场条件。
+
+### DEFAULT_TRADE_AMOUNT（默认交易金额）
+```
+默认值：$5.00
+```
+每次交易的 USDC 金额。从小额开始，随着信心增长而扩大规模。
+
+## 真实交易示例
+
+### 市场设置
+```
+当前比特币价格：$98,500
+周期开始于：$98,000
+比特币需要：保持在 $98,000 以上才能赢得上涨
+
+软件计算：
+- 比特币从周期开盘价上涨 +$500
+- 动量：看涨
+- 上涨获胜概率：78%
+
+市场价格：
+- 上涨代币：$0.73
+- 下跌代币：$0.27
+```
+
+### 机器人检测到机会
+```
+软件上涨：$0.78
+市场上涨：$0.73
+差额：$0.05 > 阈值 ($0.015) ✅
+```
+
+### 机器人执行
+```
+1. 买入 6.85 份额 @ $0.73 = $5.00
+2. 卖出 6.85 份额 @ $0.74（止盈）
+3. 卖出 6.85 份额 @ $0.725（止损）
+```
+
+### 结果 1：比特币保持上涨（85% 概率）
+```
+周期以比特币价格 $98,600 收盘
+上涨代币 = $1.00
+
+止盈在 $0.74 成交：
+卖出：6.85 × $0.74 = $5.07
+利润：$0.07（约 30 分钟内 1.4%）
+```
+
+### 结果 2：比特币暴跌（15% 概率）
+```
+周期以比特币价格 $97,800 收盘
+下跌获胜，上涨 = $0.00
+
+止损在 $0.725 成交：
+卖出：6.85 × $0.725 = $4.97
+亏损：-$0.03（0.6% 损失）
+```
+
+### 期望值
 ```
 EV = (85% × $0.07) + (15% × -$0.03)
 EV = $0.0595 - $0.0045
-EV = $0.055 per trade
+EV = 每笔交易 $0.055
 
-With 20 trades/day:
-Daily Expected: $1.10
-Monthly Expected: $33
-Annual Expected: $400 (80% ROI on $5 trades)
+每天 20 笔交易：
+每日期望：$1.10
+每月期望：$33
+年度期望：$400（$5 交易的 80% ROI）
 ```
 
-## Scaling Strategy
+## 扩展策略
 
-### Phase 1: Validation ($5 trades)
-- Run for 1 week
-- Track win rate
-- Verify strategy works
-- Target: 60%+ win rate
+### 阶段 1：验证（$5 交易）
+- 运行 1 周
+- 跟踪胜率
+- 验证策略有效
+- 目标：60%+ 胜率
 
-### Phase 2: Small Scale ($10-20 trades)
-- Double trade size
-- Monitor slippage
-- Ensure liquidity adequate
-- Target: Consistent profits
+### 阶段 2：小规模（$10-20 交易）
+- 交易规模翻倍
+- 监控滑点
+- 确保流动性充足
+- 目标：持续盈利
 
-### Phase 3: Medium Scale ($50-100 trades)
-- Increase position size
-- Watch for market impact
-- Diversify across markets
-- Target: $10-20 daily profit
+### 阶段 3：中等规模（$50-100 交易）
+- 增加仓位规模
+- 关注市场影响
+- 跨市场分散
+- 目标：每日 $10-20 利润
 
-### Phase 4: Large Scale ($500+ trades)
-- Institutional size
-- Multiple markets
-- Risk management critical
-- Target: $100+ daily profit
+### 阶段 4：大规模（$500+ 交易）
+- 机构规模
+- 多个市场
+- 风险管理至关重要
+- 目标：每日 $100+ 利润
 
-## Risk Management
+## 风险管理
 
-### Position Sizing
-Never risk more than 1-2% of capital per trade:
+### 仓位规模
+每笔交易风险不超过资本的 1-2%：
 ```
-$500 capital → Max $10 per trade
-$5,000 capital → Max $100 per trade
-```
-
-### Daily Loss Limit
-Stop trading if daily loss exceeds:
-```
-3% of total capital
+$500 资本 → 每笔交易最多 $10
+$5,000 资本 → 每笔交易最多 $100
 ```
 
-### Market Conditions
-Avoid trading when:
-- Spread > $0.05 (low liquidity)
-- Volume < $1,000 (thin market)
-- Major news pending (high volatility)
-
-## Key Success Factors
-
-### 1. Software Oracle Accuracy
-Bot assumes software predictions are more accurate than market. Verify this holds true.
-
-### 2. Execution Speed
-Opportunities disappear quickly. Fast execution captures best prices.
-
-### 3. Liquidity
-Ensure sufficient buyers/sellers at target prices. Low liquidity = slippage.
-
-### 4. Market Selection
-Bitcoin hourly markets have:
-- High volume
-- Frequent trading
-- Clear price discovery
-
-## Common Pitfalls
-
-### Overtrading
-**Problem**: Trading every small difference burns gas fees
-**Solution**: Maintain minimum threshold of $0.015
-
-### Ignoring Slippage
-**Problem**: Actual fill price worse than expected
-**Solution**: Add 1% buffer to buy prices
-
-### Emotional Override
-**Problem**: Manually closing profitable positions early
-**Solution**: Trust the stop loss and take profit levels
-
-### Insufficient Capital
-**Problem**: Can't absorb losing streaks
-**Solution**: Start with $500+ bankroll for $5 trades
-
-## Performance Metrics
-
-Track these weekly:
-
-### Win Rate
+### 每日亏损限制
+如果每日亏损超过以下限制则停止交易：
 ```
-Wins / Total Trades
-Target: 60-70%
+总资本的 3%
 ```
 
-### Average Win/Loss
+### 市场条件
+在以下情况下避免交易：
+- 价差 > $0.05（流动性低）
+- 成交量 < $1,000（市场清淡）
+- 重大新闻待发布（高波动性）
+
+## 关键成功因素
+
+### 1. 软件预言机准确性
+机器人假设软件预测比市场更准确。验证这一点是否成立。
+
+### 2. 执行速度
+机会迅速消失。快速执行可以获得最佳价格。
+
+### 3. 流动性
+确保目标价格有足够的买家/卖家。低流动性 = 滑点。
+
+### 4. 市场选择
+比特币小时市场具有：
+- 高成交量
+- 频繁交易
+- 清晰的价格发现
+
+## 常见陷阱
+
+### 过度交易
+**问题**：交易每个小差异会消耗 Gas 费用
+**解决方案**：保持最低阈值 $0.015
+
+### 忽略滑点
+**问题**：实际成交价格比预期更差
+**解决方案**：为买入价格添加 1% 缓冲
+
+### 情绪化干预
+**问题**：过早手动平仓盈利头寸
+**解决方案**：信任止损和止盈水平
+
+### 资本不足
+**问题**：无法承受连续亏损
+**解决方案**：$5 交易至少需要 $500+ 的资金
+
+## 性能指标
+
+每周跟踪这些指标：
+
+### 胜率
 ```
-Avg Win: Target $0.01+
-Avg Loss: Target -$0.005 max
+获胜次数 / 总交易次数
+目标：60-70%
 ```
 
-### Profit Factor
+### 平均盈亏
 ```
-Gross Profit / Gross Loss
-Target: 2.0+
-```
-
-### Sharpe Ratio
-```
-(Return - Risk Free) / Std Dev
-Target: 1.5+
+平均盈利：目标 $0.01+
+平均亏损：目标最多 -$0.005
 ```
 
-## Setup Requirements
-
-### 1. Capital
+### 利润因子
 ```
-Minimum: $500 USDC
-Recommended: $2,000+ USDC
+总利润 / 总亏损
+目标：2.0+
 ```
 
-### 2. Wallet
+### 夏普比率
 ```
-Ethereum wallet with private key
-Funded with USDC on Polygon
-```
-
-### 3. API Credentials
-```
-Polymarket CLOB API credentials
-Generated from private key
+(回报 - 无风险利率) / 标准差
+目标：1.5+
 ```
 
-### 4. Software Access
+## 设置要求
+
+### 1. 资本
 ```
-WebSocket connection to price oracle
+最低：$500 USDC
+推荐：$2,000+ USDC
+```
+
+### 2. 钱包
+```
+带有私钥的以太坊钱包
+在 Polygon 上充值 USDC
+```
+
+### 3. API 凭证
+```
+Polymarket CLOB API 凭证
+从私钥生成
+```
+
+### 4. 软件访问
+```
+连接到价格预言机的 WebSocket
 ws://45.130.166.119:5001
 ```
 
-## Advanced Optimizations
+## 高级优化
 
-### Multi-Market Trading
-Run bot on multiple markets simultaneously:
-- Bitcoin UP/DOWN
-- Ethereum UP/DOWN
-- Stock Index UP/DOWN
+### 多市场交易
+在多个市场上同时运行机器人：
+- 比特币 上涨/下跌
+- 以太坊 上涨/下跌
+- 股指 上涨/下跌
 
-### Dynamic Thresholds
-Adjust threshold based on:
-- Volatility (higher threshold when volatile)
-- Liquidity (lower threshold when liquid)
-- Time remaining (tighter threshold near close)
+### 动态阈值
+根据以下条件调整阈值：
+- 波动性（波动时提高阈值）
+- 流动性（流动时降低阈值）
+- 剩余时间（接近收盘时收紧阈值）
 
-### Order Book Analysis
-Examine depth to avoid:
-- Thin markets (spread > $0.05)
-- Whale manipulation (large orders one side)
-- Front-running risk (order book changes fast)
+### 订单簿分析
+检查深度以避免：
+- 清淡市场（价差 > $0.05）
+- 巨鲸操纵（一侧有大订单）
+- 抢先交易风险（订单簿变化快）
 
-## Backtesting Results
+## 回测结果
 
-Based on 30-day historical data:
+基于 30 天历史数据：
 
-### Metrics
+### 指标
 ```
-Total Trades: 247
-Wins: 168 (68%)
-Losses: 79 (32%)
-Average Win: $0.68
-Average Loss: -$0.32
-Net Profit: $88.76
-ROI: 177% annualized
-Max Drawdown: -8.3%
-```
-
-### Best Conditions
-```
-Time: 9 AM - 11 AM ET (high volatility)
-Threshold: 0.015 - 0.025 (sweet spot)
-Market: Bitcoin hourly (best liquidity)
+总交易次数：247
+获胜：168 (68%)
+亏损：79 (32%)
+平均盈利：$0.68
+平均亏损：-$0.32
+净利润：$88.76
+年化 ROI：177%
+最大回撤：-8.3%
 ```
 
-## Legal & Compliance
+### 最佳条件
+```
+时间：东部时间上午 9 点 - 11 点（高波动性）
+阈值：0.015 - 0.025（最佳点）
+市场：比特币小时（最佳流动性）
+```
 
-### Disclaimer
-This is educational software. Trading involves risk. Past performance doesn't guarantee future results.
+## 法律与合规
 
-### Regulatory
-Check your jurisdiction's laws on:
-- Prediction markets
-- Algorithmic trading
-- Cryptocurrency trading
+### 免责声明
+这是教育软件。交易涉及风险。过去的表现不保证未来的结果。
 
-### Tax Implications
-Profits may be taxable. Consult tax professional for:
-- Capital gains reporting
-- Trading activity classification
-- Record keeping requirements
+### 监管
+检查您所在司法管辖区关于以下方面的法律：
+- 预测市场
+- 算法交易
+- 加密货币交易
 
-## Support & Resources
+### 税务影响
+利润可能需要纳税。咨询税务专业人士了解：
+- 资本利得报告
+- 交易活动分类
+- 记录保存要求
 
-### Monitor Performance
-- Track every trade
-- Review daily/weekly
-- Adjust parameters based on results
+## 支持与资源
 
-### Community
-- Share experiences
-- Learn from others
-- Report bugs/improvements
+### 监控性能
+- 跟踪每笔交易
+- 每日/每周审查
+- 根据结果调整参数
 
-### Updates
-- Bot logic improvements
-- New market support
-- Enhanced risk management
+### 社区
+- 分享经验
+- 向他人学习
+- 报告错误/改进
 
-## Conclusion
+### 更新
+- 机器人逻辑改进
+- 新市场支持
+- 增强风险管理
 
-This bot profits from **market inefficiency**, not from predicting Bitcoin's direction. By:
+## 结论
 
-1. Detecting price discrepancies
-2. Executing fast automated trades
-3. Managing risk with stop loss/take profit
-4. Compounding small consistent wins
+该机器人从**市场低效**中获利，而不是预测比特币的方向。通过：
 
-With proper capital, configuration, and risk management, the bot can generate steady returns from prediction market arbitrage.
+1. 检测价格差异
+2. 执行快速自动化交易
+3. 使用止损/止盈管理风险
+4. 复利小额持续盈利
 
-**Remember**: Start small, validate the strategy, then scale gradually as you gain confidence.
+通过适当的资本、配置和风险管理，该机器人可以从预测市场套利中产生稳定的回报。
+
+**记住**：从小额开始，验证策略，然后随着信心的增长逐步扩大规模。
 

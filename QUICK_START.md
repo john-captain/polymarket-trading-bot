@@ -1,19 +1,19 @@
-# Auto Trading Bot - Quick Start
+# 自动交易机器人 - 快速入门
 
-## What This Bot Does
+## 该机器人的功能
 
-Automatically trades Polymarket prediction markets to profit from price discrepancies between a software price oracle and actual market prices.
+自动交易 Polymarket 预测市场，从软件价格预言机和实际市场价格之间的价格差异中获利。
 
-## How to Run
+## 如何运行
 
-### 1. Install Dependencies
+### 1. 安装依赖
 ```bash
 cd polymarket-ts-bot
 npm install
 ```
 
-### 2. Configure Environment
-Edit `.env` file:
+### 2. 配置环境
+编辑 `.env` 文件：
 ```env
 PRIVATE_KEY=0xYourPrivateKeyHere
 SOFTWARE_WS_URL=ws://45.130.166.119:5001
@@ -24,115 +24,115 @@ DEFAULT_TRADE_AMOUNT=5.0
 TRADE_COOLDOWN=30
 ```
 
-### 3. Generate Credentials
+### 3. 生成凭证
 ```bash
 npm run gen-creds
 ```
 
-### 4. Start Auto Trading
+### 4. 启动自动交易
 ```bash
 npm run auto-trade
 ```
 
-## What Happens When Running
+## 运行时发生的事情
 
 ```
-1. Bot connects to software price oracle (WebSocket)
-2. Bot connects to Polymarket price feed (WebSocket)
-3. Bot monitors price differences continuously
-4. When opportunity detected (difference > $0.015):
-   → Places BUY order immediately
-   → Places TAKE PROFIT sell order (+$0.01)
-   → Places STOP LOSS sell order (-$0.005)
-5. Repeats every 30 seconds (cooldown)
+1. 机器人连接到软件价格预言机（WebSocket）
+2. 机器人连接到 Polymarket 价格源（WebSocket）
+3. 机器人持续监控价格差异
+4. 当检测到机会时（差异 > $0.015）：
+   → 立即下买单
+   → 下止盈卖单（+$0.01）
+   → 下止损卖单（-$0.005）
+5. 每 30 秒重复一次（冷却时间）
 ```
 
-## Example Output
+## 示例输出
 
 ```
-Starting Auto Trading Bot...
-Wallet: 0xda2d...b263
-Finding current Bitcoin market...
-Market found: Bitcoin Up or Down - November 22, 9AM ET
-UP Token: 74767151816109143033...
-DOWN Token: 24201538121789638558...
-Software WebSocket connected
-Polymarket WebSocket connected
-Bot started successfully!
+启动自动交易机器人...
+钱包：0xda2d...b263
+查找当前比特币市场...
+找到市场：Bitcoin Up or Down - November 22, 9AM ET
+上涨代币：74767151816109143033...
+下跌代币：24201538121789638558...
+软件 WebSocket 已连接
+Polymarket WebSocket 已连接
+机器人成功启动！
 
-🎯 Trade opportunity detected!
-Token: UP
-Software Price: $0.7500
-Polymarket Price: $0.7300
-Difference: $0.0200
+🎯 检测到交易机会！
+代币：上涨
+软件价格：$0.7500
+Polymarket 价格：$0.7300
+差额：$0.0200
 
-📊 Executing trade...
-Buying 6.8493 shares at $0.7300
-✅ Buy order placed: abc123...
-✅ Take Profit order placed at $0.7400
-✅ Stop Loss order placed at $0.7250
-✅ Trade execution complete!
+📊 执行交易...
+以 $0.7300 购买 6.8493 份额
+✅ 买单已下：abc123...
+✅ 止盈单已下，价格 $0.7400
+✅ 止损单已下，价格 $0.7250
+✅ 交易执行完成！
 ```
 
-## Risk Management
+## 风险管理
 
-| Risk Level | Trade Amount | Stop Loss | Take Profit |
-|-----------|--------------|-----------|-------------|
-| Conservative | $5 | $0.005 | $0.01 |
-| Moderate | $10 | $0.01 | $0.02 |
-| Aggressive | $20 | $0.02 | $0.04 |
+| 风险级别 | 交易金额 | 止损 | 止盈 |
+|---------|---------|------|------|
+| 保守 | $5 | $0.005 | $0.01 |
+| 中等 | $10 | $0.01 | $0.02 |
+| 激进 | $20 | $0.02 | $0.04 |
 
-**Recommendation**: Start with Conservative ($5 trades) for first week.
+**建议**：第一周从保守型（$5 交易）开始。
 
-## Stopping the Bot
+## 停止机器人
 
-Press `Ctrl+C` to stop the bot gracefully.
+按 `Ctrl+C` 优雅地停止机器人。
 
-## Files Created
+## 创建的文件
 
-- `.credentials.json` - Your API credentials (git-ignored)
-- Trade logs in console output
+- `.credentials.json` - 您的 API 凭证（git 忽略）
+- 控制台输出中的交易日志
 
-## Troubleshooting
+## 故障排除
 
-### "Private key not found"
-→ Add your private key to `.env` file
+### "未找到私钥"
+→ 将您的私钥添加到 `.env` 文件
 
-### "No active Bitcoin market found"
-→ Bot runs on hourly Bitcoin markets. Wait for next hour.
+### "未找到活跃的比特币市场"
+→ 机器人在比特币小时市场上运行。等待下一个小时。
 
-### "Insufficient balance"
-→ Fund wallet with USDC on Polygon network
+### "余额不足"
+→ 在 Polygon 网络上为钱包充值 USDC
 
-### "Connection failed"
-→ Check internet connection and firewall settings
+### "连接失败"
+→ 检查互联网连接和防火墙设置
 
-## Performance Tracking
+## 性能跟踪
 
-Monitor these metrics:
-- **Win Rate**: Target 60-70%
-- **Average Profit**: Target $0.01+ per trade
-- **Daily Profit**: Target $1-5+ (with $5 trades)
+监控这些指标：
+- **胜率**：目标 60-70%
+- **平均利润**：目标每笔交易 $0.01+
+- **每日利润**：目标 $1-5+（使用 $5 交易）
 
-## Safety Features
+## 安全功能
 
-✅ Stop loss protects against large losses
-✅ Take profit locks in gains automatically
-✅ Cooldown prevents overtrading
-✅ Threshold filters out small opportunities
-✅ Automatic reconnection on disconnect
+✅ 止损防止大额损失
+✅ 止盈自动锁定收益
+✅ 冷却时间防止过度交易
+✅ 阈值过滤小机会
+✅ 断线时自动重连
 
-## Next Steps
+## 下一步
 
-1. Run bot for 24 hours with $5 trades
-2. Track results (wins vs losses)
-3. If profitable after 20+ trades, consider scaling up
-4. Read `PROFIT_STRATEGY.md` for detailed strategy explanation
+1. 使用 $5 交易运行机器人 24 小时
+2. 跟踪结果（获胜 vs 失败）
+3. 如果 20+ 笔交易后盈利，考虑扩大规模
+4. 阅读 `PROFIT_STRATEGY.md` 了解详细策略解释
 
-## Support
+## 支持
 
-For issues or questions:
-- Check `PROFIT_STRATEGY.md` for strategy details
-- Check `CREDENTIALS_GUIDE.md` for credential issues
-- Review `README.md` for full documentation
+如有问题或疑问：
+- 查看 `PROFIT_STRATEGY.md` 了解策略细节
+- 查看 `CREDENTIALS_GUIDE.md` 了解凭证问题
+- 查看 `README.md` 了解完整文档
 
