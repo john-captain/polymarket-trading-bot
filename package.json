@@ -7,6 +7,7 @@
     "build": "tsc",
     "start": "node dist/main.js",
     "dev": "ts-node src/main.ts",
+    "web": "ts-node src/web_server.ts",
     "auto-trade": "ts-node src/auto_trading_bot.ts",
     "check-balance": "ts-node src/check_balance.ts",
     "gen-creds": "ts-node src/generate_credentials.ts",
@@ -26,6 +27,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^24.10.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
@@ -38,6 +40,7 @@
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "ethers": "^5.7.2",
+    "express": "^4.21.0",
     "ws": "^8.18.3"
   }
 }

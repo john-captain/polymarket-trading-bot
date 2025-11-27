@@ -2,6 +2,9 @@
 
 一个专业的基于 TypeScript 的 Polymarket 交易机器人，具有完整的凭证管理、订单执行、市场分析和**自动化套利交易**功能。
 
+正式域名：http://polymarket.wukongbc.com/
+测试域名：http://poldev.wukongbc.com/
+
 ## 功能特性
 
 - 🔐 **凭证管理**：安全的私钥处理和 API 身份验证
