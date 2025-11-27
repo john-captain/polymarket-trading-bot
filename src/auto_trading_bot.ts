@@ -4,6 +4,7 @@ import WebSocket from 'ws';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { BalanceChecker, BalanceInfo } from './balance_checker';
+import { BinanceOracle } from './binance_oracle';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -55,7 +56,7 @@ class AutoTradingBot {
     private tradeCooldown: number;
     private tradeAmount: number;
     
-    private softwareWs: WebSocket | null = null;
+    private binanceOracle: BinanceOracle;
     private polymarketWs: WebSocket | null = null;
     private isRunning: boolean = false;
 
@@ -75,6 +76,7 @@ class AutoTradingBot {
             this.wallet
         );
         this.balanceChecker = new BalanceChecker();
+        this.binanceOracle = new BinanceOracle();
 
         this.priceThreshold = parseFloat(process.env.PRICE_DIFFERENCE_THRESHOLD || '0.015');
         this.stopLossAmount = parseFloat(process.env.STOP_LOSS_AMOUNT || '0.005');
@@ -114,7 +116,7 @@ class AutoTradingBot {
         await this.initializeMarket();
         
         console.log('\n📡 正在连接数据源...');
-        await this.connectSoftwareWebSocket();
+        await this.setupBinanceOracle();
         await this.connectPolymarketWebSocket();
         
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -198,44 +200,26 @@ class AutoTradingBot {
         console.log(`DOWN 代币: ${this.tokenIdDown.substring(0, 20)}...`);
     }
 
-    private async connectSoftwareWebSocket() {
-        const url = process.env.SOFTWARE_WS_URL || 'ws://45.130.166.119:5001';
+    private async setupBinanceOracle() {
+        console.log('\n📡 正在启动 Binance 预言机...');
         
-        const connect = () => {
-            if (!this.isRunning) return;
-            
-            this.softwareWs = new WebSocket(url);
-            
-            this.softwareWs.on('open', () => {
-                console.log('✅ 软件 WebSocket 已连接');
-            });
-
-            this.softwareWs.on('message', (data) => {
-                try {
-                    const message = JSON.parse(data.toString());
-                    const probUp = message.prob_up || 0;
-                    const probDown = message.prob_down || 0;
-
-                    this.softwarePrices.UP = probUp / 100.0;
-                    this.softwarePrices.DOWN = probDown / 100.0;
-                } catch (error) {
-                }
-            });
-
-            this.softwareWs.on('error', (error) => {
-                console.error('软件 WebSocket 错误:', error.message);
-            });
-
-            this.softwareWs.on('close', () => {
-                console.log('软件 WebSocket 已关闭');
-                if (this.isRunning) {
-                    console.log('5秒后重新连接...');
-                    setTimeout(connect, 5000);
-                }
-            });
-        };
+        // 设置价格更新回调
+        this.binanceOracle.onPrice((prices) => {
+            this.softwarePrices.UP = prices.UP;
+            this.softwarePrices.DOWN = prices.DOWN;
+        });
         
-        connect();
+        // 设置连接状态回调
+        this.binanceOracle.onConnection((connected) => {
+            if (connected) {
+                console.log('✅ Binance 预言机已连接并正常工作');
+            } else {
+                console.log('⚠️  Binance 预言机连接断开，将自动重连...');
+            }
+        });
+        
+        // 连接
+        this.binanceOracle.connect();
     }
 
     private async connectPolymarketWebSocket() {
@@ -481,7 +465,7 @@ class AutoTradingBot {
 
     stop() {
         this.isRunning = false;
-        this.softwareWs?.close();
+        this.binanceOracle.disconnect();
         this.polymarketWs?.close();
         console.log('机器人已停止');
     }
