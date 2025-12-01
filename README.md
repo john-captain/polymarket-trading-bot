@@ -261,7 +261,14 @@ npx tsc --noEmit
 
 # 代码检查
 npx eslint src/
+
+# 重启 Web 服务并重新部署
+cd /home/php/polymarket-trading-bot && pm2 restart polymarket-web && pm2 logs polymarket-web --lines 20 --nostream
+# 杀掉占用端口的进程再启动  
+fuser -k 3000/tcp 2>/dev/null; sleep 2 && pm2 restart polymarket-web
 ```
+
+
 
 ## 安全注意事项
 

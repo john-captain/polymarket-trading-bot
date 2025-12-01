@@ -5,6 +5,7 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { BalanceChecker, BalanceInfo } from './balance_checker';
 import { BinanceOracle } from './binance_oracle';
+import { exit } from 'process';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -88,6 +89,9 @@ class AutoTradingBot {
     async start() {
         console.log('='.repeat(60));
         console.log('启动自动交易机器人...');
+        console.log('逻辑未验证，服务不能真正运行');
+        exit();
+
         console.log('='.repeat(60));
         console.log(`钱包: ${this.wallet.address}`);
         console.log(`阈值: $${this.priceThreshold.toFixed(4)}`);
