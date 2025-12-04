@@ -121,7 +121,11 @@ export enum MarketType {
 interface TokenInfo {
     tokenId: string;
     outcome: string;
-    price: number;
+    price: number;          // 中间价 (outcomePrices)
+    bestAsk: number;        // 最低卖价 (实际买入价)
+    bestBid: number;        // 最高买价 (实际卖出价)
+    askSize: number;        // 卖单深度
+    bidSize: number;        // 买单深度
 }
 
 interface MarketInfo {
@@ -514,38 +518,67 @@ export class ArbitrageBot {
             if (tokenIds.length < 2) return null;
             if (outcomePrices.length < 2) return null;
 
+            // 流动性过滤：过滤掉流动性过低的市场
+            const liquidity = parseFloat(market.liquidity || '0');
+            const minLiquidity = parseFloat(process.env.ARB_MIN_LIQUIDITY || '100');
+            if (liquidity < minLiquidity) {
+                return null;  // 流动性太低，跳过
+            }
+
             // 判断市场类型
             const marketType = tokenIds.length > 2 ? MarketType.MULTI_OUTCOME : MarketType.BINARY;
 
-            // 使用 Gamma API 返回的价格
+            // 获取真实的订单簿价格
             const tokens: TokenInfo[] = [];
             for (let i = 0; i < tokenIds.length; i++) {
-                const price = parseFloat(outcomePrices[i]) || 0;
+                const tokenId = String(tokenIds[i]);
+                const midPrice = parseFloat(outcomePrices[i]) || 0;
+                
+                // 获取订单簿真实价格
+                const orderBook = await this.getOrderBook(tokenId);
+                
                 tokens.push({
-                    tokenId: String(tokenIds[i]),
+                    tokenId: tokenId,
                     outcome: outcomes[i] || `选项${i + 1}`,
-                    price: price
+                    price: midPrice,
+                    bestAsk: orderBook.bestAsk,
+                    bestBid: orderBook.bestBid,
+                    askSize: orderBook.askSize,
+                    bidSize: orderBook.bidSize
                 });
             }
 
-            // 计算价格和
-            const priceSum = tokens.reduce((sum, t) => sum + t.price, 0);
+            // 使用真实的 bestAsk 价格计算价格和（做多需要买入，用 bestAsk）
+            const realAskSum = tokens.reduce((sum, t) => sum + t.bestAsk, 0);
+            // 使用真实的 bestBid 价格计算价格和（做空需要卖出，用 bestBid）
+            const realBidSum = tokens.reduce((sum, t) => sum + t.bestBid, 0);
             
-            // 计算价差和套利类型
-            // 正价差 = 做多机会 (价格和 < 1)
-            const spread = (1 - priceSum) * 100;
-            
+            // 判断套利类型
             let arbitrageType = ArbitrageType.NONE;
-            if (priceSum > 0 && priceSum < 1) {
-                arbitrageType = ArbitrageType.LONG;  // 价格和 < 1，买入所有
+            let realPriceSum = 1; // 默认无套利
+            let spread = 0;
+            
+            if (realAskSum > 0 && realAskSum < 1) {
+                // 做多套利：买入所有结果，价格和 < 1
+                arbitrageType = ArbitrageType.LONG;
+                realPriceSum = realAskSum;
+                spread = (1 - realAskSum) * 100;
+            } else if (realBidSum > 1) {
+                // 做空套利：卖出所有结果，价格和 > 1
+                arbitrageType = ArbitrageType.SHORT;
+                realPriceSum = realBidSum;
+                spread = (realBidSum - 1) * 100;
+            } else {
+                // 没有套利机会
+                return null;
             }
 
             // 找到 Yes 和 No 的索引
             let upIndex = outcomes.findIndex((o: string) => 
-                o.toLowerCase().includes('up') || o.toLowerCase().includes('yes')
+                o.toLowerCase().includes('up') || o.toLowerCase().includes('yes') || o.toLowerCase().includes('over')
             );
             let downIndex = outcomes.findIndex((o: string) => 
-                o.toLowerCase().includes('down') || o.toLowerCase().includes('no')
+                o.toLowerCase().includes('down') || o.toLowerCase().includes('no') || o.toLowerCase().includes('under')
             );
 
             if (upIndex === -1) upIndex = 0;
@@ -553,12 +586,19 @@ export class ArbitrageBot {
 
             const upTokenId = String(tokenIds[upIndex]);
             const downTokenId = String(tokenIds[downIndex]);
-            const upPrice = tokens[upIndex]?.price || 0;
-            const downPrice = tokens[downIndex]?.price || 0;
+            
+            // 根据套利类型使用不同的价格
+            // 做多用 bestAsk（买入价），做空用 bestBid（卖出价）
+            const upPrice = arbitrageType === ArbitrageType.LONG 
+                ? (tokens[upIndex]?.bestAsk || 0) 
+                : (tokens[upIndex]?.bestBid || 0);
+            const downPrice = arbitrageType === ArbitrageType.LONG 
+                ? (tokens[downIndex]?.bestAsk || 0) 
+                : (tokens[downIndex]?.bestBid || 0);
 
-            // 获取市场分类和流动性
+            // 获取市场分类
             const category = market.category || market.tags?.[0] || 'Other';
-            const liquidity = parseFloat(market.liquidity || market.volume24hr || '0');
+            const marketLiquidity = parseFloat(market.liquidity || market.volume24hr || '0');
 
             // 获取事件 slug（用于生成正确的 Polymarket 链接）
             // 优先使用 events[0].slug，否则使用市场的 slug
@@ -577,10 +617,10 @@ export class ArbitrageBot {
                 downTokenId,
                 upPrice,
                 downPrice,
-                priceSum,
+                priceSum: realPriceSum,
                 spread,
                 arbitrageType,
-                liquidity,
+                liquidity: marketLiquidity,
                 category
             };
         } catch (error) {
@@ -631,6 +671,68 @@ export class ArbitrageBot {
             }
         }
         return 0;
+    }
+
+    /**
+     * 获取订单簿详细信息
+     */
+    private async getOrderBook(tokenId: string, retries = 2): Promise<{
+        bestAsk: number;
+        bestBid: number;
+        askSize: number;
+        bidSize: number;
+    }> {
+        const defaultResult = { bestAsk: 1, bestBid: 0, askSize: 0, bidSize: 0 };
+        
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(
+                    `https://clob.polymarket.com/book?token_id=${tokenId}`,
+                    {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            'Accept': 'application/json'
+                        }
+                    }
+                );
+                
+                if (response.status === 429) {
+                    await this.delay((i + 1) * 500);
+                    continue;
+                }
+                
+                if (!response.ok) return defaultResult;
+                
+                const data: any = await response.json();
+                
+                const asks = data.asks || [];
+                const bids = data.bids || [];
+                
+                // 找到最低 ask（最低卖价 = 买入价）
+                let bestAsk = 1;
+                let askSize = 0;
+                if (asks.length > 0) {
+                    // asks 按价格从低到高排序
+                    bestAsk = parseFloat(asks[0].price);
+                    askSize = parseFloat(asks[0].size);
+                }
+                
+                // 找到最高 bid（最高买价 = 卖出价）
+                let bestBid = 0;
+                let bidSize = 0;
+                if (bids.length > 0) {
+                    // bids 按价格从高到低排序
+                    bestBid = parseFloat(bids[0].price);
+                    bidSize = parseFloat(bids[0].size);
+                }
+                
+                return { bestAsk, bestBid, askSize, bidSize };
+            } catch (error) {
+                if (i === retries - 1) return defaultResult;
+                await this.delay(300);
+            }
+        }
+        return defaultResult;
     }
 
     // ============== 套利检测 (论文优化版) ==============

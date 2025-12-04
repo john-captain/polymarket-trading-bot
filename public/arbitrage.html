@@ -665,10 +665,13 @@
                         if (spreadAbs >= 1) spreadClass = 'good';
                         else if (spreadAbs >= 0.5) spreadClass = 'ok';
                         
-                        const isLong = m.spread > 0;
+                        // 根据 deviationType 判断套利类型
+                        const isLong = m.deviationType === 'LONG';
                         const typeClass = isLong ? 'type-long' : 'type-short';
                         const typeText = isLong ? '📈 做多' : '📉 做空';
                         const typeBadgeClass = isLong ? 'type-long' : 'type-short';
+                        const priceLabel = isLong ? '买入价' : '卖出价';
+                        const actionLabel = isLong ? '买入总价' : '卖出总价';
                         
                         // Polymarket URL - 使用事件 slug + conditionId 定位到具体市场
                         let marketUrl = 'https://polymarket.com';
@@ -683,13 +686,14 @@
                             marketUrl = `https://polymarket.com/markets?q=${m.conditionId}`;
                         }
                         
-                        // 计算 1000U 预下单收益
+                        // 计算 1000U 预下单收益（使用真实订单簿价格）
                         const investAmount = 1000; // 投入金额
                         const gasPerTx = 0.01; // 每笔交易 Gas 费约 $0.01 (Polygon)
-                        const numTxs = 2; // 买 YES + 买 NO = 2 笔交易
+                        const numTxs = 2; // 买/卖 YES + 买/卖 NO = 2 笔交易
                         const gasFee = gasPerTx * numTxs;
-                        const slippageRate = 0.001; // 预估滑点 0.1%
-                        const slippageCost = investAmount * slippageRate;
+                        // 真实价格已经包含滑点，额外预留 0.05% 作为价格波动缓冲
+                        const bufferRate = 0.0005;
+                        const bufferCost = investAmount * bufferRate;
                         const priceSum = m.priceSum || 1;
                         
                         let grossProfit;
@@ -698,11 +702,11 @@
                             // 收益 = 投入 × (1 - 价格和) / 价格和
                             grossProfit = investAmount * (1 - priceSum) / priceSum;
                         } else {
-                            // 做空: 卖出所有结果
+                            // 做空: 卖出所有结果，价格和 > 1
                             // 收益 = 投入 × (价格和 - 1)
                             grossProfit = investAmount * (priceSum - 1);
                         }
-                        const totalFees = gasFee + slippageCost;
+                        const totalFees = gasFee + bufferCost;
                         const netProfit = grossProfit - totalFees;
                         const roi = (netProfit / investAmount * 100);
                         
@@ -718,18 +722,18 @@
                                 </div>
                                 <div class="market-item-prices">
                                     <div class="market-price yes">
-                                        <div class="price-label">YES 价格</div>
+                                        <div class="price-label">YES ${priceLabel}</div>
                                         <div class="price-value">$${(m.upPrice || 0).toFixed(4)}</div>
                                     </div>
                                     <div class="market-price no">
-                                        <div class="price-label">NO 价格</div>
+                                        <div class="price-label">NO ${priceLabel}</div>
                                         <div class="price-value">$${(m.downPrice || 0).toFixed(4)}</div>
                                     </div>
                                 </div>
                                 <div class="market-item-footer">
                                     <div>
-                                        <span>价格和: <strong>${m.priceSum.toFixed(4)}</strong></span>
-                                        <span style="margin-left: 15px;">价差: <span class="spread ${spreadClass}">${m.spread.toFixed(2)}%</span></span>
+                                        <span>${actionLabel}: <strong>${m.priceSum.toFixed(4)}</strong></span>
+                                        <span style="margin-left: 15px;">套利空间: <span class="spread ${spreadClass}">${Math.abs(m.spread).toFixed(2)}%</span></span>
                                     </div>
                                     <div class="link-hint">
                                         <span>查看详情</span>
@@ -748,7 +752,7 @@
                                             </div>
                                         </div>
                                         <div class="profit-item">
-                                            <div class="label">Gas+滑点</div>
+                                            <div class="label">Gas+缓冲</div>
                                             <div class="value negative">-$${totalFees.toFixed(2)}</div>
                                         </div>
                                         <div class="profit-item">
@@ -760,7 +764,7 @@
                                         </div>
                                     </div>
                                     <div style="font-size: 9px; color: #6b7280; margin-top: 6px; text-align: center;">
-                                        Gas: $${gasFee.toFixed(2)} (${numTxs}笔×$${gasPerTx}) | 滑点: $${slippageCost.toFixed(2)} (0.1%) | Polymarket 手续费: $0
+                                        Gas: $${gasFee.toFixed(2)} (${numTxs}笔×$${gasPerTx}) | 价格缓冲: $${bufferCost.toFixed(2)} (0.05%) | Polymarket: $0
                                     </div>
                                 </div>
                             </div>`;
@@ -782,9 +786,10 @@
                 const data = await res.json();
                 if (data.success && data.data) {
                     const opp = data.data;
-                    const isLong = opp.spread > 0;
+                    const isLong = opp.deviationType === 'LONG' || opp.spread > 0;
                     const typeClass = isLong ? 'long' : 'short';
                     const typeText = isLong ? '📈 做多机会' : '📉 做空机会';
+                    const priceLabel = isLong ? '买入价' : '卖出价';
                     
                     document.getElementById('latestOpportunity').innerHTML = `
                         <div class="opportunity-card ${typeClass}">
@@ -794,16 +799,16 @@
                             </div>
                             <div class="price-pair">
                                 <div class="price-box up">
-                                    <div class="label">YES 价格</div>
+                                    <div class="label">YES ${priceLabel}</div>
                                     <div class="value">$${opp.upPrice.toFixed(4)}</div>
                                 </div>
                                 <div class="price-box down">
-                                    <div class="label">NO 价格</div>
+                                    <div class="label">NO ${priceLabel}</div>
                                     <div class="value">$${opp.downPrice.toFixed(4)}</div>
                                 </div>
                             </div>
                             <div class="stats-row"><span>价格和</span><span>${opp.priceSum.toFixed(6)}</span></div>
-                            <div class="stats-row"><span>价差</span><span class="${isLong ? 'profit' : 'loss'}">${opp.spread.toFixed(4)}%</span></div>
+                            <div class="stats-row"><span>价差</span><span class="${isLong ? 'profit' : 'loss'}">${Math.abs(opp.spread).toFixed(4)}%</span></div>
                             <div class="stats-row"><span>预期利润</span><span class="profit">$${opp.profit.toFixed(4)}</span></div>
                             <div class="stats-row"><span>发现时间</span><span style="font-size: 11px;">${new Date(opp.timestamp).toLocaleString()}</span></div>
                         </div>`;
