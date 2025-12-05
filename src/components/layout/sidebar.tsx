@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
   Search,
-  Eye,
   Zap,
   TrendingUp,
   History,
@@ -21,6 +20,8 @@ import {
   Activity,
   BarChart3,
   Layers,
+  TestTube,
+  Database,
 } from "lucide-react"
 
 interface NavItem {
@@ -42,7 +43,7 @@ const navigation: NavItem[] = [
     icon: Search,
     children: [
       { title: "套利扫描", href: "/markets/scan", icon: Search, badge: "实时" },
-      { title: "价格监控", href: "/markets/monitor", icon: Eye },
+      { title: "同步市场", href: "/markets/sync", icon: Database },
     ],
   },
   {
@@ -60,6 +61,7 @@ const navigation: NavItem[] = [
     children: [
       { title: "交易历史", href: "/trades/history", icon: History },
       { title: "当前持仓", href: "/trades/positions", icon: Wallet },
+      { title: "测试交易", href: "/trades/test", icon: TestTube, badge: "测试" },
     ],
   },
   {

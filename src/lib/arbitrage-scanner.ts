@@ -1,8 +1,27 @@
 import axios from "axios"
+import { HttpsProxyAgent } from "https-proxy-agent"
+import { SocksProxyAgent } from "socks-proxy-agent"
 import { arbitrageState, addArbitrageLog, arbitrageSettings } from "./bot-state"
 
 const GAMMA_API = "https://gamma-api.polymarket.com"
 const CLOB_API = "https://clob.polymarket.com"
+
+// 创建代理 agent（支持 HTTP 和 SOCKS5 代理）
+function getProxyAgent() {
+  // 优先使用 SOCKS5 代理（V2rayN 默认）
+  const socksProxy = process.env.SOCKS_PROXY
+  if (socksProxy) {
+    return new SocksProxyAgent(socksProxy)
+  }
+  
+  // 其次使用 HTTP/HTTPS 代理
+  const httpProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY
+  if (httpProxy) {
+    return new HttpsProxyAgent(httpProxy)
+  }
+  
+  return undefined
+}
 
 interface Market {
   question: string
@@ -41,10 +60,13 @@ interface ParsedMarket {
 async function getOrderbookPrices(tokenId: string): Promise<{ bestAsk: number; bestBid: number }> {
   try {
     const url = `${CLOB_API}/book?token_id=${tokenId}`
+    const proxyAgent = getProxyAgent()
     const response = await axios.get(`${CLOB_API}/book`, {
       params: { token_id: tokenId },
       headers: { "User-Agent": "polymarket-bot/2.0" },
-      timeout: 5000,
+      timeout: 10000,
+      httpsAgent: proxyAgent,
+      httpAgent: proxyAgent,
     })
 
     const data = response.data
@@ -67,7 +89,13 @@ async function fetchActiveMarkets(): Promise<Market[]> {
   let offset = 0
   let hasMore = true
 
+  const proxyAgent = getProxyAgent()
+  const proxyInfo = proxyAgent 
+    ? `使用代理: ${process.env.SOCKS_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY}` 
+    : '未配置代理（直连）'
+  
   addArbitrageLog(`📡 开始获取活跃市场...`)
+  addArbitrageLog(`🌐 ${proxyInfo}`)
   addArbitrageLog(`🔗 API: ${GAMMA_API}/markets?active=true&closed=false&limit=${pageSize}`)
 
   while (hasMore) {
@@ -83,7 +111,9 @@ async function fetchActiveMarkets(): Promise<Market[]> {
           offset: offset,
         },
         headers: { "User-Agent": "polymarket-bot/2.0" },
-        timeout: 15000,
+        timeout: 30000,  // 增加超时时间
+        httpsAgent: proxyAgent,
+        httpAgent: proxyAgent,
       })
 
       const markets = response.data || []

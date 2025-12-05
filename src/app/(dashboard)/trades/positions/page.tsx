@@ -14,45 +14,45 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Package,
+  Loader2,
 } from "lucide-react"
-import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 
-// 模拟持仓数据
-const mockPositions = [
-  {
-    id: "1",
-    market: "Will BTC reach $100k by end of 2024?",
-    outcome: "Yes",
-    shares: 100,
-    avgCost: 0.55,
-    currentPrice: 0.62,
-    value: 62,
-    pnl: 7,
-    pnlPercent: 12.73,
-  },
-  {
-    id: "2",
-    market: "Who will win the 2024 US Election?",
-    outcome: "Trump",
-    shares: 50,
-    avgCost: 0.48,
-    currentPrice: 0.45,
-    value: 22.5,
-    pnl: -1.5,
-    pnlPercent: -6.25,
-  },
-]
+interface Position {
+  id: string
+  tokenId: string
+  market: string
+  outcome: string
+  shares: number
+  avgCost: number
+  currentPrice: number
+  value: number
+  pnl: number
+  pnlPercent: number
+  conditionId?: string
+}
+
+async function fetchPositions() {
+  const res = await fetch("/api/positions")
+  return res.json()
+}
 
 export default function PositionsPage() {
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ["positions"],
+    queryFn: fetchPositions,
+    refetchInterval: 30000, // 每30秒自动刷新
+  })
 
-  const totalValue = mockPositions.reduce((sum, p) => sum + p.value, 0)
-  const totalPnl = mockPositions.reduce((sum, p) => sum + p.pnl, 0)
-  const totalCost = mockPositions.reduce((sum, p) => sum + p.shares * p.avgCost, 0)
+  const positions: Position[] = data?.data || []
+  const address = data?.address || ""
+  
+  const totalValue = positions.reduce((sum, p) => sum + p.value, 0)
+  const totalPnl = positions.reduce((sum, p) => sum + p.pnl, 0)
+  const totalCost = positions.reduce((sum, p) => sum + p.shares * p.avgCost, 0)
 
   const handleRefresh = () => {
-    setIsRefreshing(true)
-    setTimeout(() => setIsRefreshing(false), 1000)
+    refetch()
   }
 
   return (
@@ -112,10 +112,10 @@ export default function PositionsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">持仓数量</p>
-                  <p className="text-2xl font-bold">{mockPositions.length}</p>
+                  <p className="text-2xl font-bold">{positions.length}</p>
                 </div>
                 <Badge variant="secondary" className="text-lg px-3 py-1">
-                  活跃
+                  {isLoading ? "加载中" : "活跃"}
                 </Badge>
               </div>
             </CardContent>
@@ -127,21 +127,32 @@ export default function PositionsPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>持仓明细</CardTitle>
-              <CardDescription>您在各个市场的持仓详情</CardDescription>
+              <CardDescription>
+                {address ? `钱包: ${address.slice(0, 6)}...${address.slice(-4)}` : "您在各个市场的持仓详情"}
+              </CardDescription>
             </div>
             <Button
               variant="outline"
               size="sm"
               className="gap-2"
               onClick={handleRefresh}
-              disabled={isRefreshing}
+              disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              {isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
               刷新
             </Button>
           </CardHeader>
           <CardContent>
-            {mockPositions.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4 animate-spin" />
+                <p className="text-muted-foreground">正在获取持仓数据...</p>
+              </div>
+            ) : positions.length === 0 ? (
               <div className="text-center py-12">
                 <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                 <p className="text-muted-foreground">暂无持仓</p>
@@ -151,7 +162,7 @@ export default function PositionsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {mockPositions.map((position) => (
+                {positions.map((position: Position) => (
                   <div
                     key={position.id}
                     className="border rounded-lg p-4 hover:bg-muted/30 transition-colors"

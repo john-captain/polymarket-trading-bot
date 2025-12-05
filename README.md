@@ -80,6 +80,8 @@ RPC_URL=https://polygon-rpc.com
 
 ```bash
 npm run dev
+
+taskkill /F /IM node.exe 2>$null; npm run dev  #重启开发服务器
 ```
 
 访问 http://localhost:3000 打开管理界面。
