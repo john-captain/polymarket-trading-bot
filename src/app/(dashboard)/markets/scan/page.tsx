@@ -10,6 +10,21 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Search,
   PlayCircle,
   StopCircle,
@@ -23,6 +38,8 @@ import {
   AlertCircle,
   DollarSign,
   Loader2,
+  HelpCircle,
+  Settings,
 } from "lucide-react"
 
 // API 请求
@@ -90,7 +107,16 @@ export default function MarketScanPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [executingMarketId, setExecutingMarketId] = useState<string | null>(null)
-  const [tradeAmount, setTradeAmount] = useState(10)  // 默认交易金额
+  const [tradeAmount, setTradeAmount] = useState(10)
+  const [showHelp, setShowHelp] = useState(false)
+  
+  // 过滤设置状态
+  const [minVolumeFilter, setMinVolumeFilter] = useState(100)
+  const [minSpreadFilter, setMinSpreadFilter] = useState(1.0)
+  const [minLiquidity, setMinLiquidity] = useState(0)
+  const [category, setCategory] = useState("")
+  const [excludeRestricted, setExcludeRestricted] = useState(false)
+  const [onlyBinaryMarkets, setOnlyBinaryMarkets] = useState(false)
 
   // 数据查询
   const { data: stats } = useQuery({
@@ -114,6 +140,34 @@ export default function MarketScanPage() {
   const { data: settingsData } = useQuery({
     queryKey: ["arbitrageSettings"],
     queryFn: fetchArbitrageSettings,
+  })
+
+  // 当设置数据加载后更新本地状态
+  const settings = settingsData?.data || {}
+  const categories = settingsData?.categories || []
+  
+  // 更新设置
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (newSettings: {
+      minVolumeFilter?: number
+      minSpread?: number
+      minLiquidity?: number
+      category?: string
+      excludeRestricted?: boolean
+      maxOutcomes?: number
+    }) => {
+      const res = await fetch("/api/arbitrage/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSettings),
+      })
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["arbitrageSettings"] })
+      toast({ title: "✅ 设置已更新" })
+    },
+    onError: () => toast({ title: "❌ 设置更新失败", variant: "destructive" }),
   })
 
   // 手动扫描
@@ -196,7 +250,6 @@ export default function MarketScanPage() {
   const isRunning = stats?.data?.isRunning || false
   const markets: Market[] = marketsData?.data || []
   const logs: string[] = logsData?.data || []
-  const settings = settingsData?.data || {}
 
   // 过滤市场
   const filteredMarkets = markets.filter((m) =>
@@ -248,18 +301,6 @@ export default function MarketScanPage() {
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-              <span className="text-sm text-muted-foreground">交易金额</span>
-              <Input
-                type="number"
-                value={tradeAmount}
-                onChange={(e) => setTradeAmount(Math.max(1, parseFloat(e.target.value) || 1))}
-                className="w-20 h-7 text-sm"
-                min={1}
-                step={1}
-              />
-              <span className="text-sm text-muted-foreground">$</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
               <span className="text-sm text-muted-foreground">自动刷新</span>
               <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
             </div>
@@ -271,15 +312,15 @@ export default function MarketScanPage() {
         </div>
 
         {/* 统计卡片 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">扫描次数</p>
-                  <p className="text-2xl font-bold">{stats?.data?.scanCount?.toLocaleString() || 0}</p>
+                  <p className="text-sm text-muted-foreground">市场总数</p>
+                  <p className="text-2xl font-bold">{stats?.data?.totalMarketCount?.toLocaleString() || 0}</p>
                 </div>
-                <Search className="h-8 w-8 text-muted-foreground/50" />
+                <Target className="h-8 w-8 text-muted-foreground/50" />
               </div>
             </CardContent>
           </Card>
@@ -288,10 +329,22 @@ export default function MarketScanPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">监控市场</p>
-                  <p className="text-2xl font-bold">{markets.length}</p>
+                  <p className="text-sm text-muted-foreground">过滤后市场</p>
+                  <p className="text-2xl font-bold">{stats?.data?.filteredMarketCount?.toLocaleString() || markets.length}</p>
                 </div>
-                <Target className="h-8 w-8 text-muted-foreground/50" />
+                <Filter className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">扫描次数</p>
+                  <p className="text-2xl font-bold">{stats?.data?.scanCount?.toLocaleString() || 0}</p>
+                </div>
+                <Search className="h-8 w-8 text-muted-foreground/50" />
               </div>
             </CardContent>
           </Card>
@@ -309,37 +362,213 @@ export default function MarketScanPage() {
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">执行交易</p>
-                  <p className="text-2xl font-bold">{stats?.data?.tradeCount || 0}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">累计利润</p>
-                  <p className={`text-2xl font-bold ${(stats?.data?.totalProfit || 0) >= 0 ? "text-success" : "text-destructive"}`}>
-                    ${(stats?.data?.totalProfit || 0).toFixed(4)}
-                  </p>
-                </div>
-                {(stats?.data?.totalProfit || 0) >= 0 ? (
-                  <TrendingUp className="h-8 w-8 text-success/50" />
-                ) : (
-                  <TrendingDown className="h-8 w-8 text-destructive/50" />
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </div>
+
+        {/* 过滤设置 */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                过滤设置
+              </CardTitle>
+              <Dialog open={showHelp} onOpenChange={setShowHelp}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    <HelpCircle className="h-4 w-4" />
+                    页面说明
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>套利扫描页面说明</DialogTitle>
+                    <DialogDescription>
+                      了解本页面的功能和套利逻辑
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-6 text-sm">
+                    <section>
+                      <h3 className="font-semibold text-base mb-2">📌 功能概述</h3>
+                      <p className="text-muted-foreground">
+                        本页面用于扫描 Polymarket 预测市场，自动发现套利机会。当所有结果的买入价之和小于 1（做多机会）或卖出价之和大于 1（做空机会）时，存在无风险套利空间。
+                      </p>
+                    </section>
+
+                    <section>
+                      <h3 className="font-semibold text-base mb-2">🔗 调用的官方 API</h3>
+                      <div className="space-y-3 text-muted-foreground">
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="font-medium text-blue-700">1. Gamma Markets API - 获取市场列表</p>
+                          <p className="mt-1 font-mono text-xs break-all">GET https://gamma-api.polymarket.com/markets</p>
+                          <p className="text-xs mt-1">参数: active, closed, limit, offset, volume_num_min, liquidity_num_min, tag_id 等</p>
+                          <a href="https://docs.polymarket.com/api-reference/markets/list-markets" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                            📄 官方文档 →
+                          </a>
+                        </div>
+                        <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <p className="font-medium text-purple-700">2. CLOB API - 获取订单簿价格</p>
+                          <p className="mt-1 font-mono text-xs break-all">GET https://clob.polymarket.com/book?token_id=xxx</p>
+                          <p className="text-xs mt-1">返回: bids (买单), asks (卖单), 用于计算真实买入/卖出价</p>
+                          <a href="https://docs.polymarket.com/api-reference/orderbook/get-order-book-summary" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:underline mt-1 inline-block">
+                            📄 官方文档 →
+                          </a>
+                        </div>
+                        <p className="text-xs">
+                          <a href="https://docs.polymarket.com/developers/gamma-markets-api/overview" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            Gamma API 概述
+                          </a>
+                          {" | "}
+                          <a href="https://docs.polymarket.com/developers/CLOB/introduction" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            CLOB API 介绍
+                          </a>
+                          {" | "}
+                          <a href="https://docs.polymarket.com/developers/CLOB/endpoints" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            API 端点列表
+                          </a>
+                        </p>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h3 className="font-semibold text-base mb-2">📊 套利逻辑</h3>
+                      <div className="space-y-3 text-muted-foreground">
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="font-medium text-green-700">做多 (LONG)</p>
+                          <p className="mt-1">当所有结果的买入价之和 &lt; 1 时，买入所有结果，无论哪个结果发生都能获得 $1</p>
+                          <p className="text-xs mt-1">利润 = 1 - 买入总价</p>
+                        </div>
+                        <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                          <p className="font-medium text-red-700">做空 (SHORT)</p>
+                          <p className="mt-1">当所有结果的卖出价之和 &gt; 1 时，卖出所有结果（需要持仓）</p>
+                          <p className="text-xs mt-1">利润 = 卖出总价 - 1</p>
+                        </div>
+                        <p className="text-xs">价差计算公式: (1 - 买入总价) / 买入总价 × 100%</p>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h3 className="font-semibold text-base mb-2">⚙️ 过滤参数说明</h3>
+                      <ul className="space-y-2 text-muted-foreground">
+                        <li><strong>最小交易量:</strong> 过滤掉交易量低于设定值的市场（低流动性市场难以成交）</li>
+                        <li><strong>最小流动性:</strong> 过滤掉流动性低于设定值的市场</li>
+                        <li><strong>最小价差:</strong> 只显示价差大于设定值的套利机会</li>
+                        <li><strong>市场分类:</strong> 只扫描特定分类的市场（如加密货币、体育等）</li>
+                        <li><strong>排除受限市场:</strong> 排除有地区限制的市场</li>
+                        <li><strong>仅二元市场:</strong> 只扫描有 2 个结果的市场（Yes/No）</li>
+                      </ul>
+                    </section>
+
+                    <section>
+                      <h3 className="font-semibold text-base mb-2">💡 使用建议</h3>
+                      <ul className="space-y-1 text-muted-foreground">
+                        <li>• 建议设置最小交易量 ≥ $1000，确保市场有足够流动性</li>
+                        <li>• 套利机会通常很短暂，发现后需要快速执行</li>
+                        <li>• 注意交易手续费可能会吃掉小额套利利润</li>
+                        <li>• 建议先用模拟模式验证策略</li>
+                      </ul>
+                    </section>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {/* 第一行：数值过滤 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">最小交易量</span>
+                <Input
+                  type="number"
+                  value={minVolumeFilter}
+                  onChange={(e) => setMinVolumeFilter(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-24 h-8 text-sm"
+                  min={0}
+                  step={100}
+                />
+                <span className="text-sm text-muted-foreground">$</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">最小流动性</span>
+                <Input
+                  type="number"
+                  value={minLiquidity}
+                  onChange={(e) => setMinLiquidity(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-24 h-8 text-sm"
+                  min={0}
+                  step={100}
+                />
+                <span className="text-sm text-muted-foreground">$</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">最小价差</span>
+                <Input
+                  type="number"
+                  value={minSpreadFilter}
+                  onChange={(e) => setMinSpreadFilter(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-20 h-8 text-sm"
+                  min={0}
+                  step={0.1}
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">市场分类</span>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="w-32 h-8 text-sm">
+                    <SelectValue placeholder="全部" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat: { value: string; label: string }) => (
+                      <SelectItem key={cat.value} value={cat.value || "all"}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-6 mt-4">
+              {/* 第二行：开关选项 */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={excludeRestricted}
+                  onCheckedChange={setExcludeRestricted}
+                  id="excludeRestricted"
+                />
+                <label htmlFor="excludeRestricted" className="text-sm text-muted-foreground cursor-pointer">
+                  排除受限市场
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={onlyBinaryMarkets}
+                  onCheckedChange={setOnlyBinaryMarkets}
+                  id="onlyBinaryMarkets"
+                />
+                <label htmlFor="onlyBinaryMarkets" className="text-sm text-muted-foreground cursor-pointer">
+                  仅二元市场
+                </label>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => updateSettingsMutation.mutate({
+                  minVolumeFilter,
+                  minSpread: minSpreadFilter,
+                  minLiquidity,
+                  category: category === "all" ? "" : category,
+                  excludeRestricted,
+                  maxOutcomes: onlyBinaryMarkets ? 2 : 0,
+                })}
+                disabled={updateSettingsMutation.isPending}
+              >
+                {updateSettingsMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                ) : null}
+                应用设置
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* 主内容区 */}
         <div className="grid gap-6 lg:grid-cols-3">

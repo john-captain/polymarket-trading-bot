@@ -21,13 +21,13 @@ export function Header({ title, description }: HeaderProps) {
 
       <div className="flex items-center gap-4">
         {/* 搜索框 */}
-        <div className="relative hidden md:block">
+        {/* <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="搜索市场..."
             className="w-64 pl-9"
           />
-        </div>
+        </div> */}
 
         {/* 通知 */}
         <Button variant="ghost" size="icon" className="relative">

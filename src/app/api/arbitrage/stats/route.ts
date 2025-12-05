@@ -11,6 +11,8 @@ export async function GET() {
       opportunityCount: arbitrageState.opportunityCount,
       tradeCount: arbitrageState.tradeCount,
       totalProfit: arbitrageState.totalProfit,
+      totalMarketCount: arbitrageState.totalMarketCount,
+      filteredMarketCount: arbitrageState.filteredMarketCount,
       settings: arbitrageSettings,
     },
   })

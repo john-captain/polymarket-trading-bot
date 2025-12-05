@@ -18,6 +18,8 @@ interface ArbitrageState {
   markets: any[]
   logs: string[]
   scanInterval: NodeJS.Timeout | null
+  totalMarketCount: number  // 市场总数
+  filteredMarketCount: number  // 过滤后的市场数
 }
 
 interface ArbitrageSettings {
@@ -25,6 +27,12 @@ interface ArbitrageSettings {
   tradeAmount: number
   scanInterval: number
   autoTrade: boolean
+  minVolumeFilter: number  // 最小交易量过滤
+  minLiquidity: number     // 最小流动性
+  category: string         // 市场分类 (空字符串表示全部)
+  excludeRestricted: boolean  // 排除受限市场
+  onlyWithOrderbook: boolean  // 只显示有订单簿的市场
+  maxOutcomes: number      // 最大结果数 (2 表示只显示二元市场)
 }
 
 // 机器人状态
@@ -46,6 +54,8 @@ export const arbitrageState: ArbitrageState = {
   markets: [],
   logs: [],
   scanInterval: null,
+  totalMarketCount: 0,
+  filteredMarketCount: 0,
 }
 
 // 套利设置
@@ -54,7 +64,31 @@ export const arbitrageSettings: ArbitrageSettings = {
   tradeAmount: parseFloat(process.env.ARB_TRADE_AMOUNT || "10.0"),
   scanInterval: parseInt(process.env.ARB_SCAN_INTERVAL || "60000"),
   autoTrade: false,
+  minVolumeFilter: parseFloat(process.env.ARB_MIN_VOLUME || "100"),
+  minLiquidity: parseFloat(process.env.ARB_MIN_LIQUIDITY || "0"),
+  category: "",  // 空字符串表示全部分类
+  excludeRestricted: false,
+  onlyWithOrderbook: true,
+  maxOutcomes: 0,  // 0 表示不限制
 }
+
+// 可用的市场分类
+export const MARKET_CATEGORIES = [
+  { value: "", label: "全部分类" },
+  { value: "Crypto", label: "加密货币" },
+  { value: "Sports", label: "体育" },
+  { value: "US-current-affairs", label: "美国时事" },
+  { value: "Global Politics", label: "全球政治" },
+  { value: "Business", label: "商业" },
+  { value: "Tech", label: "科技" },
+  { value: "Science", label: "科学" },
+  { value: "Pop-Culture", label: "流行文化" },
+  { value: "Space", label: "航天" },
+  { value: "Art", label: "艺术" },
+  { value: "Chess", label: "国际象棋" },
+  { value: "Olympics", label: "奥运会" },
+  { value: "NFTs", label: "NFT" },
+]
 
 // 系统日志
 export const systemLogs: string[] = []

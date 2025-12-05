@@ -234,41 +234,137 @@ export default function MarketMakingPage() {
         {/* 做市原理说明 */}
         <Card>
           <CardHeader>
-            <CardTitle>做市策略原理</CardTitle>
+            <CardTitle>做市策略原理详解</CardTitle>
             <CardDescription>
-              了解做市策略如何运作
+              深入理解做市策略如何在预测市场赚取稳定收益
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge className="h-6 w-6 rounded-full p-0 flex items-center justify-center">1</Badge>
-                  <h4 className="font-medium">双向挂单</h4>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  在买卖双方同时挂出限价单，以买卖价差赚取利润
-                </p>
-              </div>
+          <CardContent className="space-y-6">
+            {/* 核心原理 */}
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <h4 className="font-semibold mb-3">💡 核心思想：不赌方向，只赚流动性</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                做市商（Market Maker）通过在买卖双方同时挂单，赚取买卖价差（Spread）。
+                无论市场结果是 YES 还是 NO，只要有人交易，做市商就能赚取中间的差价。
+              </p>
+            </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge className="h-6 w-6 rounded-full p-0 flex items-center justify-center">2</Badge>
-                  <h4 className="font-medium">持仓管理</h4>
+            {/* 操作流程 */}
+            <div>
+              <h4 className="font-semibold mb-4">📋 操作流程</h4>
+              <div className="grid md:grid-cols-4 gap-4">
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mx-auto mb-2">
+                    <span className="font-bold text-primary">1</span>
+                  </div>
+                  <h5 className="font-medium text-sm mb-1">选择市场</h5>
+                  <p className="text-xs text-muted-foreground">选择流动性好、波动适中的活跃市场</p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  监控持仓变化，当单边持仓过大时自动调整订单
-                </p>
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mx-auto mb-2">
+                    <span className="font-bold text-primary">2</span>
+                  </div>
+                  <h5 className="font-medium text-sm mb-1">双向挂单</h5>
+                  <p className="text-xs text-muted-foreground">买单挂 49¢，卖单挂 51¢，价差 2%</p>
+                </div>
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mx-auto mb-2">
+                    <span className="font-bold text-primary">3</span>
+                  </div>
+                  <h5 className="font-medium text-sm mb-1">等待成交</h5>
+                  <p className="text-xs text-muted-foreground">有人买或卖时，订单被动成交</p>
+                </div>
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-success/10 mx-auto mb-2">
+                    <span className="font-bold text-success">4</span>
+                  </div>
+                  <h5 className="font-medium text-sm mb-1">赚取价差</h5>
+                  <p className="text-xs text-muted-foreground">买卖差价就是利润（扣除手续费）</p>
+                </div>
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge className="h-6 w-6 rounded-full p-0 flex items-center justify-center">3</Badge>
-                  <h4 className="font-medium">风险控制</h4>
+            {/* 举例说明 */}
+            <div className="rounded-lg border p-4">
+              <h4 className="font-semibold mb-3">📊 实例演示</h4>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm font-medium mb-2">假设市场："2025年BTC突破10万美元？"</p>
+                  <ul className="text-sm text-muted-foreground space-y-1.5">
+                    <li>• 当前中间价：<span className="font-mono text-foreground">50¢</span></li>
+                    <li>• 买单价格：<span className="font-mono text-green-600">49¢</span>（愿意以49¢买入YES）</li>
+                    <li>• 卖单价格：<span className="font-mono text-red-600">51¢</span>（愿意以51¢卖出YES）</li>
+                    <li>• 价差收益：<span className="font-mono text-primary">2¢</span>（每成交1股赚2美分）</li>
+                  </ul>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  设置最大持仓、止损阈值，防止极端行情下的大额亏损
-                </p>
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-sm font-medium mb-2">收益计算：</p>
+                  <div className="text-sm space-y-1">
+                    <p>• 买入100股 YES @ 49¢ = 支出 $49</p>
+                    <p>• 卖出100股 YES @ 51¢ = 收入 $51</p>
+                    <p className="font-medium text-success">• 净利润 = $2（4%回报率）</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 库存偏斜管理 */}
+            <div className="rounded-lg border p-4">
+              <h4 className="font-semibold mb-3">⚖️ 库存偏斜管理（关键风控）</h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                做市最大风险是单边持仓过多。如果只有买单成交、卖单没人接，就会累积大量 YES 仓位。
+              </p>
+              <div className="grid md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-green-50 rounded-lg p-3">
+                  <p className="font-medium text-green-700 mb-1">✅ 理想状态</p>
+                  <p className="text-green-600">YES/NO 持仓 1:1</p>
+                  <p className="text-green-600">无方向风险</p>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-3">
+                  <p className="font-medium text-yellow-700 mb-1">⚠️ 偏斜警告</p>
+                  <p className="text-yellow-600">单边持仓 &gt; 70%</p>
+                  <p className="text-yellow-600">调整报价吸引对手方</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3">
+                  <p className="font-medium text-red-700 mb-1">🔴 高风险</p>
+                  <p className="text-red-600">单边持仓 &gt; 90%</p>
+                  <p className="text-red-600">使用 Merge 赎回减仓</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Merge 功能说明 */}
+            <div className="rounded-lg border p-4">
+              <h4 className="font-semibold mb-3">🔄 Merge 功能（风险对冲神器）</h4>
+              <p className="text-sm text-muted-foreground mb-2">
+                当同时持有 YES 和 NO 代币时，可以调用智能合约的 Merge 功能，将一对 YES+NO 赎回为 $1 USDC。
+              </p>
+              <div className="bg-blue-50 rounded-lg p-3 text-sm">
+                <p className="font-medium text-blue-700 mb-1">示例：</p>
+                <p className="text-blue-600">持有 100股YES + 100股NO → Merge → 取回 $100 USDC</p>
+                <p className="text-muted-foreground mt-1">这样可以释放资金，同时消除方向风险</p>
+              </div>
+            </div>
+
+            {/* 适用场景与风险 */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="rounded-lg border p-4">
+                <h4 className="font-semibold mb-2 text-green-600">✅ 适用场景</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• 高流动性市场（日交易量 &gt; $10k）</li>
+                  <li>• 价格稳定的市场（波动率 &lt; 5%/天）</li>
+                  <li>• 临近结算的确定性市场</li>
+                  <li>• 有多个做市商竞争的市场</li>
+                </ul>
+              </div>
+              <div className="rounded-lg border p-4">
+                <h4 className="font-semibold mb-2 text-red-600">⚠️ 风险提示</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• 突发新闻导致价格剧烈波动</li>
+                  <li>• 单边成交累积大量库存</li>
+                  <li>• 市场流动性枯竭无法出货</li>
+                  <li>• 与专业做市商竞争劣势</li>
+                </ul>
               </div>
             </div>
           </CardContent>

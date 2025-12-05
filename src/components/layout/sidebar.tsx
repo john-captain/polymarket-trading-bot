@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Activity,
   BarChart3,
+  Layers,
 } from "lucide-react"
 
 interface NavItem {
@@ -48,6 +49,7 @@ const navigation: NavItem[] = [
     title: "策略",
     icon: Zap,
     children: [
+      { title: "铸造拆分", href: "/strategies/mint-split", icon: Layers },
       { title: "套利策略", href: "/strategies/arbitrage", icon: TrendingUp },
       { title: "做市策略", href: "/strategies/market-making", icon: BarChart3 },
     ],
