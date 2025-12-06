@@ -89,6 +89,11 @@ taskkill /F /IM node.exe 2>$null; npm run dev  #重启开发服务器
 ### 生产部署
 
 ```bash
+ss -ltnp | grep ':3000' || true
+kill -9 26109 && sleep 1 && ss -ltnp | grep ':3000' || true
+npm run start
+
+
 # 构建生产版本
 npm run build
 
@@ -191,6 +196,39 @@ polymarket-trading-bot/
 - `zustand` - 状态管理
 - `tailwindcss` - CSS 框架
 - `shadcn/ui` - UI 组件库
+
+
+### 关键参数 (.env)
+
+```bash
+ARB_MIN_SPREAD=1.0      # 最小价差 (%)
+ARB_MIN_PROFIT=0.02     # 最小利润 ($)
+ARB_TRADE_AMOUNT=10.0   # 每边金额 ($)
+ARB_SCAN_INTERVAL=2000  # 扫描间隔 (ms)
+PRIVATE_KEY=0x...       # Polygon 钱包私钥
+
+# 代理配置 (可选)
+HTTP_PROXY=http://127.0.0.1:7890    # HTTP 代理
+SOCKS_PROXY=socks5://127.0.0.1:7890 # SOCKS5 代理
+```
+
+### 代理支持
+
+API 请求支持通过代理访问，实现在 `src/lib/arbitrage-scanner.ts`：
+
+```typescript
+import { SocksProxyAgent } from 'socks-proxy-agent'
+import { HttpsProxyAgent } from 'https-proxy-agent'
+
+// 根据环境变量自动选择代理类型
+const proxyUrl = process.env.SOCKS_PROXY || process.env.HTTP_PROXY
+const agent = proxyUrl?.startsWith('socks') 
+  ? new SocksProxyAgent(proxyUrl)
+  : new HttpsProxyAgent(proxyUrl)
+
+// 在 fetch 请求中使用
+const response = await fetch(url, { agent })
+```
 
 ## 许可证
 

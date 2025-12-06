@@ -14,8 +14,9 @@
 | **UI** | TailwindCSS + shadcn/ui | 组件库 (Radix UI) |
 | **状态管理** | Zustand + React Query | 客户端状态、数据获取 |
 | **后端** | Next.js API Routes | `/src/app/api/*` |
-| **交易逻辑** | TypeScript | `/server/*.ts` (原 Express 代码) |
-| **数据库** | MySQL | 交易记录存储 |
+| **交易逻辑** | TypeScript | `/server/*.ts` + `/src/lib/strategies/*.ts` |
+| **数据库** | MySQL | 市场数据 + 交易记录存储 |
+| **API 层** | 统一 API 客户端 | `src/lib/api-client/` (Gamma自建 + CLOB官方SDK包装) |
 
 ## 项目结构
 
@@ -24,17 +25,25 @@ src/
 ├── app/                      # Next.js App Router
 │   ├── (dashboard)/          # 路由组 - 带侧边栏的页面
 │   │   ├── overview/         # 总览仪表盘
-│   │   ├── markets/scan/     # 套利扫描
-│   │   ├── markets/monitor/  # 价格监控
-│   │   ├── strategies/       # 策略配置
-│   │   ├── trades/history/   # 交易历史
-│   │   ├── trades/positions/ # 当前持仓
+│   │   ├── markets/
+│   │   │   ├── scan/         # 套利扫描 (实时)
+│   │   │   └── sync/         # 市场同步 (从 API 同步到数据库)
+│   │   ├── strategies/
+│   │   │   ├── mint-split/   # 铸造拆分策略 (核心现金牛)
+│   │   │   ├── arbitrage/    # 双边套利策略
+│   │   │   └── market-making/# 做市策略
+│   │   ├── trades/
+│   │   │   ├── history/      # 交易历史
+│   │   │   ├── positions/    # 当前持仓
+│   │   │   └── test/         # 测试交易 (低风险验证)
 │   │   └── settings/         # 系统设置
 │   ├── api/                  # API 路由
 │   │   ├── balance/          # 钱包余额
-│   │   ├── arbitrage/        # 套利相关 API
-│   │   ├── bot/              # 机器人控制
-│   │   └── logs/             # 日志
+│   │   ├── arbitrage/        # 套利相关 API (start/stop/stats/settings)
+│   │   ├── markets/          # 市场数据 API (sync/reset)
+│   │   ├── strategies/       # 策略控制 API
+│   │   ├── positions/        # 持仓查询 API
+│   │   └── trades/           # 交易执行 API (testMarkets/testExecute)
 │   ├── layout.tsx            # 根布局
 │   ├── page.tsx              # 首页 (重定向到 /overview)
 │   └── globals.css           # 全局样式 (CSS 变量)
@@ -42,47 +51,120 @@ src/
 │   ├── layout/               # 布局组件 (Sidebar, Header)
 │   └── ui/                   # shadcn/ui 组件
 ├── lib/
-│   ├── bot-state.ts          # 全局状态管理
-│   ├── arbitrage-scanner.ts  # 套利扫描逻辑
-│   └── utils.ts              # 工具函数
+│   ├── api-client/           # ⭐ 统一 API 请求层 (新增)
+│   │   ├── types.ts          # 类型定义
+│   │   ├── base.ts           # ApiClient 基础类 (代理/限速/重试/日志)
+│   │   ├── gamma.ts          # GammaClient (市场数据, 自建)
+│   │   ├── clob.ts           # ClobClientWrapper (包装官方SDK)
+│   │   └── index.ts          # 统一导出
+│   ├── database.ts           # MySQL 数据库操作 (市场+交易+API日志)
+│   ├── bot-state.ts          # 套利机器人全局状态
+│   ├── arbitrage-scanner.ts  # 套利扫描逻辑 (支持代理)
+│   ├── polymarket-contracts.ts # 智能合约交互 (铸造/拆分)
+│   ├── strategies/           # 策略实现
+│   │   ├── mint-split.ts     # 铸造拆分策略 ⭐核心
+│   │   ├── market-making.ts  # 做市策略
+│   │   └── configs/          # 策略配置
+│   └── utils.ts              # 工具函数 (cn, 格式化)
+├── types/
+│   └── index.ts              # 统一类型定义 (Market, Trade, Strategy)
 └── hooks/                    # React Hooks
 
-server/                       # 原后端交易逻辑 (独立运行)
+server/                       # 独立后端交易逻辑
 ├── arbitrage_bot.ts          # 双边套利策略
 ├── auto_trading_bot.ts       # 单向套利策略
+├── market_order.ts           # 订单执行 (CLOB Client)
 ├── binance_oracle.ts         # Binance 价格预言机
-├── market_order.ts           # 订单执行
 └── db.ts                     # MySQL 数据库
+
+docs/queue-system/            # 队列系统升级文档 (PRD)
+├── 00-index.md               # 文档索引
+├── 01-architecture.md        # 架构设计
+├── 02-scan-storage.md        # 扫描存储队列
+├── 03-strategy-queues.md     # 策略队列设计
+├── 04-database-api.md        # 数据库和API设计
+├── 05-pages.md               # 页面设计
+├── 06-tasks.md               # 开发任务清单
+└── 07-verification.md        # 验收标准
 ```
+
+## 统一 API 请求层 ⭐新增
+
+所有 Polymarket API 调用都应通过 `src/lib/api-client/` 统一处理：
+
+### 架构
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   统一 API 请求层                            │
+├─────────────────────────────────────────────────────────────┤
+│   GammaClient (自建)          ClobClientWrapper (包装SDK)    │
+│   - getMarkets()              - getOrderBook()              │
+│   - getMarket()               - createOrder()               │
+│   - getEvents()               - cancelOrder()               │
+│   - searchMarkets()           - getOpenOrders()             │
+├─────────────────────────────────────────────────────────────┤
+│   ApiClient 基础类                                          │
+│   ✓ HTTP/SOCKS 代理  ✓ 令牌桶限速  ✓ 指数退避重试  ✓ 日志    │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+                  api_request_logs (MySQL)
+```
+
+### 使用方式
+```typescript
+import { getGammaClient, getClobClient, initApiClients, generateTraceId } from '@/lib/api-client'
+
+// 初始化（启用数据库日志）
+await initApiClients()
+
+const traceId = generateTraceId()
+const context = { traceId, source: 'scan-queue' }
+
+// Gamma API: 自建客户端 (无官方SDK)
+const gamma = getGammaClient()
+const markets = await gamma.getMarkets({ active: true, limit: 100 }, context)
+
+// CLOB API: 包装官方 @polymarket/clob-client SDK
+const clob = getClobClient()
+const book = await clob.getOrderBook(tokenId, context)
+const order = await clob.createOrder({
+  tokenId, side: 'BUY', price: 0.5, size: 10
+}, { tickSize: '0.01', negRisk: false }, context)
+```
+
+### SDK 说明
+| API | 实现 | 说明 |
+|-----|------|------|
+| **Gamma API** | `GammaClient` (自建) | Polymarket 无官方 SDK，需自建 |
+| **CLOB API** | `ClobClientWrapper` | 复用官方 `@polymarket/clob-client` SDK |
+
 
 ## 开发命令
 
 ```bash
 npm run dev          # 启动 Next.js 开发服务器 (localhost:3000)
-npm run build        # 生产构建
-npm run start        # 生产服务器
 npm run gen-creds    # 生成 Polymarket API 凭证
 npm run check-balance # 检查钱包余额
+
+# Windows PowerShell 重启开发服务器
+taskkill /F /IM node.exe 2>$null; npm run dev
 ```
 
-## 核心套利策略
 
-> 基于论文《Polymarket 预测市场中的套利行为》
+## 核心交易策略
 
-| 类型 | 条件 | 操作 | 利润公式 |
-|------|------|------|----------|
-| **做多 (LONG)** | 价格和 < 1 | 买入所有结果 | `投入 × (1 - 价格和) / 价格和` |
-| **做空 (SHORT)** | 价格和 > 1 | 卖出所有结果 | `投入 × (价格和 - 1)` |
+本系统实现了三种套利策略：
 
-### 关键参数 (.env)
+| 策略 | 代码位置 | 说明 |
+|------|----------|------|
+| **Mint-Split** ⭐ | `src/lib/strategies/mint-split.ts` | 铸造拆分 - 价格和>1时铸造卖出 |
+| **Arbitrage** | `src/lib/strategies/configs/` | 双边套利 - LONG/SHORT |
+| **Market-Making** | `src/lib/strategies/market-making.ts` | 做市 - 双边挂单赚价差 |
 
-```bash
-ARB_MIN_SPREAD=1.0      # 最小价差 (%)
-ARB_MIN_PROFIT=0.02     # 最小利润 ($)
-ARB_TRADE_AMOUNT=10.0   # 每边金额 ($)
-ARB_SCAN_INTERVAL=2000  # 扫描间隔 (ms)
-PRIVATE_KEY=0x...       # Polygon 钱包私钥
-```
+策略管理器：`src/lib/strategies/index.ts`
+
+
 
 ## 项目约定 (必须遵守)
 
@@ -298,17 +380,6 @@ function calculateProfit(priceSum: number, amount: number): number {
 // HACK: 临时解决方案，需要重构
 ```
 
-#### Git 提交规范
-```bash
-# 格式：<type>: <description>
-feat: 添加套利扫描页面
-fix: 修复余额显示精度问题
-refactor: 重构 API 响应格式
-style: 调整卡片间距
-docs: 更新部署文档
-chore: 升级依赖版本
-```
-
 ## 关键集成点
 
 | 服务 | URL | 用途 |
@@ -322,7 +393,7 @@ chore: 升级依赖版本
 
 ## 数据库配置 (MySQL)
 
-交易记录存储在 MySQL，配置在 `.env`：
+市场数据和交易记录存储在 MySQL，配置在 `.env`：
 
 ```bash
 DB_HOST=localhost
@@ -331,44 +402,40 @@ DB_PASSWORD=your_password
 DB_NAME=polymarket
 ```
 
-数据库操作封装在 `server/db.ts`，主要表：
+数据库操作封装在：
+- `src/lib/database.ts` - Web 端市场数据操作 (MarketRecord 接口，60+ 字段) + API 请求日志
+- `server/db.ts` - 后端交易记录操作
+
+主要表：
+- `markets` - 市场完整数据 (包含所有 Gamma API 字段)
+- `market_price_history` - 市场价格历史记录
 - `trades` - 交易记录
 - `arbitrage_logs` - 套利日志
+- `api_request_logs` - API 请求日志 (新增，用于调试和审计)
 
-## 生产部署 (PM2)
-
-```bash
-# 1. 构建生产版本
-npm run build
-
-# 2. 使用 PM2 启动
-pm2 start npm --name "polymarket-web" -- run start
-
-# 常用命令
-pm2 restart polymarket-web   # 重启
-pm2 logs polymarket-web      # 查看日志
-pm2 stop polymarket-web      # 停止
-pm2 delete polymarket-web    # 删除
-
-# 设置开机自启
-pm2 startup
-pm2 save
-```
-
-**Nginx 反向代理** (可选)：
-```nginx
-server {
-    listen 80;
-    server_name polymarket.wukongbc.com;
-    
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
+### MarketRecord 关键字段
+```typescript
+interface MarketRecord {
+  // 基础信息
+  id: string                    // 市场唯一 ID
+  question: string              // 市场问题
+  condition_id: string          // 条件 ID
+  
+  // 价格信息 (显示精度 4 位小数)
+  yes_price: number             // Yes 价格
+  no_price: number              // No 价格
+  
+  // Token 信息
+  clob_token_ids: string        // JSON 格式的 token ID 列表
+  
+  // 状态和过滤
+  active: boolean               // 是否活跃
+  closed: boolean               // 是否已关闭
+  archived: boolean             // 是否已归档
+  
+  // 分类和标签
+  tags: string                  // JSON 格式的标签数组
+  slug: string                  // URL 友好标识符
 }
 ```
 
@@ -378,7 +445,6 @@ server {
 2. **市场数据为空**：API 请求需添加 `User-Agent` 头
 3. **页面 404**：检查 `(dashboard)` 路由组下的文件结构
 4. **样式不生效**：确认 `tailwind.config.ts` 包含正确的 content 路径
-5. **PM2 端口占用**：`pm2 delete all` 后重新启动
 
 ## 调试
 
@@ -386,10 +452,6 @@ server {
 # 测试 API
 curl http://localhost:3000/api/balance
 curl http://localhost:3000/api/arbitrage/stats
-
-# 查看日志
-tail -f /tmp/next-dev.log  # 开发模式
-pm2 logs polymarket-web    # 生产模式
 ```
 
 ---

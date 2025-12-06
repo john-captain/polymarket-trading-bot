@@ -977,3 +977,269 @@ export async function getPriceHistoryStats(): Promise<{
     newestRecord: stats.newestRecord || null,
   }
 }
+
+// ==================== API 请求日志 ====================
+
+/**
+ * API 客户端类型
+ */
+export type ApiClientType = 'GAMMA' | 'CLOB' | 'RPC'
+
+/**
+ * HTTP 方法
+ */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+/**
+ * API 请求日志记录
+ */
+export interface ApiRequestLogRecord {
+  id?: number
+  clientType: ApiClientType
+  endpoint: string
+  method: HttpMethod
+  requestParams?: Record<string, any>
+  requestHeaders?: Record<string, string>
+  statusCode?: number
+  responseData?: any
+  responseSize?: number
+  durationMs: number
+  success: boolean
+  errorMessage?: string
+  retryCount?: number
+  traceId?: string
+  source?: string
+  createdAt?: Date
+}
+
+/**
+ * 初始化 API 请求日志表
+ */
+export async function initApiRequestLogsTable(): Promise<void> {
+  const p = getPool()
+  await p.execute(`
+    CREATE TABLE IF NOT EXISTS api_request_logs (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+      client_type ENUM('GAMMA', 'CLOB', 'RPC') NOT NULL COMMENT 'API 类型',
+      endpoint VARCHAR(500) NOT NULL COMMENT '请求端点',
+      method ENUM('GET', 'POST', 'PUT', 'DELETE') NOT NULL COMMENT 'HTTP 方法',
+      request_params JSON COMMENT '请求参数',
+      request_headers JSON COMMENT '请求头',
+      status_code INT COMMENT 'HTTP 状态码',
+      response_data JSON COMMENT '响应数据',
+      response_size INT COMMENT '响应大小',
+      duration_ms INT NOT NULL COMMENT '请求耗时',
+      success BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否成功',
+      error_message TEXT COMMENT '错误信息',
+      retry_count INT DEFAULT 0 COMMENT '重试次数',
+      trace_id VARCHAR(36) COMMENT '追踪ID',
+      source VARCHAR(100) COMMENT '调用来源',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '请求时间',
+      INDEX idx_client_type (client_type),
+      INDEX idx_endpoint (endpoint(100)),
+      INDEX idx_created_at (created_at),
+      INDEX idx_success (success),
+      INDEX idx_trace_id (trace_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='API 请求日志表'
+  `)
+  console.log('✅ API 请求日志表已初始化')
+}
+
+/**
+ * 保存 API 请求日志
+ */
+export async function saveApiRequestLog(log: ApiRequestLogRecord): Promise<number> {
+  const p = getPool()
+  const sql = `
+    INSERT INTO api_request_logs 
+    (client_type, endpoint, method, request_params, request_headers, 
+     status_code, response_data, response_size, duration_ms, success, 
+     error_message, retry_count, trace_id, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `
+  
+  // 截断大响应数据
+  let responseData = log.responseData
+  if (responseData) {
+    const jsonStr = JSON.stringify(responseData)
+    if (jsonStr.length > 10000) {
+      responseData = { _truncated: true, _size: jsonStr.length }
+    }
+  }
+  
+  const [result] = await p.execute(sql, [
+    log.clientType,
+    log.endpoint,
+    log.method,
+    log.requestParams ? JSON.stringify(log.requestParams) : null,
+    log.requestHeaders ? JSON.stringify(log.requestHeaders) : null,
+    log.statusCode || null,
+    responseData ? JSON.stringify(responseData) : null,
+    log.responseSize || null,
+    log.durationMs,
+    log.success ? 1 : 0,
+    log.errorMessage || null,
+    log.retryCount || 0,
+    log.traceId || null,
+    log.source || null,
+  ])
+  return (result as any).insertId
+}
+
+/**
+ * 查询 API 请求日志
+ */
+export async function getApiRequestLogs(options: {
+  clientType?: ApiClientType
+  success?: boolean
+  traceId?: string
+  source?: string
+  startTime?: Date
+  endTime?: Date
+  limit?: number
+  offset?: number
+} = {}): Promise<ApiRequestLogRecord[]> {
+  const p = getPool()
+  const { 
+    clientType, success, traceId, source, 
+    startTime, endTime, 
+    limit = 100, offset = 0 
+  } = options
+  
+  let whereClause = '1=1'
+  const params: any[] = []
+  
+  if (clientType) {
+    whereClause += ' AND client_type = ?'
+    params.push(clientType)
+  }
+  if (success !== undefined) {
+    whereClause += ' AND success = ?'
+    params.push(success ? 1 : 0)
+  }
+  if (traceId) {
+    whereClause += ' AND trace_id = ?'
+    params.push(traceId)
+  }
+  if (source) {
+    whereClause += ' AND source = ?'
+    params.push(source)
+  }
+  if (startTime) {
+    whereClause += ' AND created_at >= ?'
+    params.push(startTime)
+  }
+  if (endTime) {
+    whereClause += ' AND created_at <= ?'
+    params.push(endTime)
+  }
+  
+  const sql = `
+    SELECT 
+      id,
+      client_type as clientType,
+      endpoint,
+      method,
+      request_params as requestParams,
+      request_headers as requestHeaders,
+      status_code as statusCode,
+      response_data as responseData,
+      response_size as responseSize,
+      duration_ms as durationMs,
+      success,
+      error_message as errorMessage,
+      retry_count as retryCount,
+      trace_id as traceId,
+      source,
+      created_at as createdAt
+    FROM api_request_logs
+    WHERE ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT ${Number(limit)} OFFSET ${Number(offset)}
+  `
+  
+  const [rows] = await p.execute(sql, params)
+  return (rows as any[]).map(row => ({
+    ...row,
+    requestParams: row.requestParams ? JSON.parse(row.requestParams) : null,
+    requestHeaders: row.requestHeaders ? JSON.parse(row.requestHeaders) : null,
+    responseData: row.responseData ? JSON.parse(row.responseData) : null,
+    success: !!row.success,
+  }))
+}
+
+/**
+ * 获取 API 请求日志统计
+ */
+export async function getApiRequestLogStats(options: {
+  startTime?: Date
+  endTime?: Date
+} = {}): Promise<{
+  total: number
+  success: number
+  failed: number
+  avgDuration: number
+  byClient: { clientType: string; count: number; avgDuration: number }[]
+}> {
+  const p = getPool()
+  const { startTime, endTime } = options
+  
+  let whereClause = '1=1'
+  const params: any[] = []
+  
+  if (startTime) {
+    whereClause += ' AND created_at >= ?'
+    params.push(startTime)
+  }
+  if (endTime) {
+    whereClause += ' AND created_at <= ?'
+    params.push(endTime)
+  }
+  
+  // 总体统计
+  const [totalResult] = await p.execute(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success,
+      SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+      AVG(duration_ms) as avgDuration
+    FROM api_request_logs
+    WHERE ${whereClause}
+  `, params)
+  
+  const totals = (totalResult as any)[0]
+  
+  // 按客户端分组
+  const [byClientResult] = await p.execute(`
+    SELECT 
+      client_type as clientType,
+      COUNT(*) as count,
+      AVG(duration_ms) as avgDuration
+    FROM api_request_logs
+    WHERE ${whereClause}
+    GROUP BY client_type
+  `, params)
+  
+  return {
+    total: totals.total || 0,
+    success: totals.success || 0,
+    failed: totals.failed || 0,
+    avgDuration: Math.round(totals.avgDuration || 0),
+    byClient: byClientResult as any[],
+  }
+}
+
+/**
+ * 清理旧的 API 请求日志
+ * @param daysToKeep 保留最近多少天的数据
+ */
+export async function cleanOldApiRequestLogs(daysToKeep: number = 7): Promise<number> {
+  const p = getPool()
+  const [result] = await p.execute(
+    `DELETE FROM api_request_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`,
+    [daysToKeep]
+  )
+  const deleted = (result as any).affectedRows
+  console.log(`🗑️ 已清理 ${deleted} 条旧 API 请求日志`)
+  return deleted
+}
