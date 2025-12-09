@@ -62,15 +62,6 @@ export async function POST(request: NextRequest) {
           config.enabled ?? true,
           config
         )
-        
-        // 如果是 arbitrage，同时保存 SHORT 配置
-        if (strategy === 'arbitrage') {
-          await saveStrategyConfig(
-            'ARBITRAGE_SHORT',
-            config.short?.enabled ?? true,
-            config
-          )
-        }
       }
     }
 

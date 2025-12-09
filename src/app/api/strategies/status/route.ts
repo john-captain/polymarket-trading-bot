@@ -26,10 +26,9 @@ export async function GET() {
     const dispatcher = getStrategyDispatcher()
     
     // 获取各策略今日统计
-    const [mintSplitToday, arbitrageLongToday, arbitrageShortToday, marketMakingToday] = await Promise.all([
+    const [mintSplitToday, arbitrageLongToday, marketMakingToday] = await Promise.all([
       getTodayOpportunityStats('MINT_SPLIT'),
       getTodayOpportunityStats('ARBITRAGE_LONG'),
-      getTodayOpportunityStats('ARBITRAGE_SHORT'),
       getTodayOpportunityStats('MARKET_MAKING'),
     ])
     
@@ -57,11 +56,6 @@ export async function GET() {
             enabled: config.arbitrage.long.enabled,
             today: arbitrageLongToday,
             dispatched: dispatcherStats.byStrategy['ARBITRAGE_LONG'] || { count: 0, matched: 0 },
-          },
-          short: {
-            enabled: config.arbitrage.short.enabled,
-            today: arbitrageShortToday,
-            dispatched: dispatcherStats.byStrategy['ARBITRAGE_SHORT'] || { count: 0, matched: 0 },
           },
           queue: arbitrageQueue.getStats(),
         },

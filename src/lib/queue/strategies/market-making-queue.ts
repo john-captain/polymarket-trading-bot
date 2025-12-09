@@ -109,6 +109,7 @@ export class MarketMakingQueue {
   private queue: PQueue
   private activeMarkets: Map<string, MarketMakingState> = new Map()
   private opportunities: Map<string, MarketMakingOpportunity> = new Map()
+  private cooldowns: Map<string, number> = new Map() // conditionId -> 上次退出时间
   private eventListeners: Map<QueueEventType, ((data: any) => void)[]> = new Map()
   private refreshTimer: NodeJS.Timeout | null = null
 
@@ -162,8 +163,29 @@ export class MarketMakingQueue {
         }
       }
 
-      // 检查配置
+      // 检查冷却时间
       const config = getStrategyConfigManager().getStrategyConfig('marketMaking')
+      if (this.isInCooldown(opportunity.conditionId, config.cooldownMs)) {
+        return {
+          success: false,
+          conditionId: opportunity.conditionId,
+          action: 'enter',
+          error: '市场冷却中',
+        }
+      }
+
+      // 检查总持仓限制
+      const totalPosition = this.getTotalOpenPosition()
+      if (totalPosition + config.maxPositionPerSide > config.maxOpenPosition) {
+        return {
+          success: false,
+          conditionId: opportunity.conditionId,
+          action: 'enter',
+          error: `总持仓超限: $${totalPosition.toFixed(0)} + $${config.maxPositionPerSide} > $${config.maxOpenPosition}`,
+        }
+      }
+
+      // 检查配置
       const canTrade = getStrategyConfigManager().canExecuteTrade('MARKET_MAKING', config.maxPositionPerSide)
       if (!canTrade.allowed) {
         return {
@@ -408,6 +430,9 @@ export class MarketMakingQueue {
       this.activeMarkets.delete(conditionId)
       this.stats.totalMarketsExited++
 
+      // 设置冷却时间
+      this.setCooldown(conditionId)
+
       // 更新机会状态
       const opportunity = Array.from(this.opportunities.values())
         .find(o => o.conditionId === conditionId)
@@ -578,8 +603,63 @@ export class MarketMakingQueue {
       }
     }
   }
-}
 
+  /**
+   * 检查冷却状态
+   */
+  private isInCooldown(conditionId: string, cooldownMs: number): boolean {
+    const lastTime = this.cooldowns.get(conditionId)
+    if (!lastTime) return false
+    return Date.now() - lastTime < cooldownMs
+  }
+
+  /**
+   * 设置冷却
+   */
+  private setCooldown(conditionId: string): void {
+    this.cooldowns.set(conditionId, Date.now())
+  }
+
+  /**
+   * 获取总持仓价值
+   */
+  private getTotalOpenPosition(): number {
+    let total = 0
+    for (const state of this.activeMarkets.values()) {
+      total += state.totalPositionValue
+    }
+    return total
+  }
+
+  /**
+   * 检查库存偏斜并触发合并
+   */
+  async checkAndMergeIfNeeded(conditionId: string): Promise<void> {
+    const config = getStrategyConfigManager().getStrategyConfig('marketMaking')
+    if (!config.autoMerge) return
+
+    const state = this.activeMarkets.get(conditionId)
+    if (!state) return
+
+    // 检查偏斜阈值
+    if (Math.abs(state.inventorySkew) < config.skewThreshold) return
+
+    // 检查双边持仓是否达到合并阈值
+    const positions = state.positions
+    if (positions.length < 2) return
+
+    const minPosition = Math.min(...positions.map(p => p.size))
+    if (minPosition < config.mergeThreshold) return
+
+    // 触发合并
+    console.log(`🔄 [MarketMakingQueue] 触发自动合并: ${conditionId}, 偏斜=${state.inventorySkew.toFixed(2)}`)
+    
+    // TODO: 调用合约执行 merge
+    // await contracts.mergeTokens(conditionId, minPosition, positions.length)
+    
+    this.stats.totalMerges++
+  }
+}
 // ==================== 单例导出 ====================
 
 // 使用 globalThis 防止开发模式热重载时丢失状态

@@ -7,9 +7,8 @@
  * 3. 分发给对应的策略队列处理
  * 
  * 策略分发规则：
- * - Mint-Split: 多选项市场(≥3) + Bid总价 > 1
+ * - Mint-Split: 多选项市场(≥2) + Bid总价 > 1
  * - Arbitrage LONG: 二元市场 + Ask总价 < 1
- * - Arbitrage SHORT: 二元市场 + Bid总价 > 1
  * - Market-Making: 高流动性市场
  */
 
@@ -21,7 +20,7 @@ import { getStrategyConfigManager } from './strategy-config'
 /**
  * 策略类型
  */
-export type StrategyType = 'MINT_SPLIT' | 'ARBITRAGE_LONG' | 'ARBITRAGE_SHORT' | 'MARKET_MAKING'
+export type StrategyType = 'MINT_SPLIT' | 'ARBITRAGE_LONG' | 'MARKET_MAKING'
 
 /**
  * 置信度等级
@@ -93,7 +92,6 @@ export interface DispatcherStats {
 export interface StrategyEnableConfig {
   mintSplit: boolean
   arbitrageLong: boolean
-  arbitrageShort: boolean
   marketMaking: boolean
 }
 
@@ -118,7 +116,6 @@ export const DEFAULT_DISPATCHER_CONFIG: DispatcherConfig = {
   strategies: {
     mintSplit: true,
     arbitrageLong: true,
-    arbitrageShort: true,
     marketMaking: false, // 默认关闭，风险较高
   },
   autoDispatch: false, // 默认不自动分发，需手动确认
@@ -160,7 +157,6 @@ export class StrategyDispatcher {
       byStrategy: {
         MINT_SPLIT: 0,
         ARBITRAGE_LONG: 0,
-        ARBITRAGE_SHORT: 0,
         MARKET_MAKING: 0,
       },
       lastDispatchAt: null,
@@ -241,7 +237,6 @@ export class StrategyDispatcher {
       case 'MINT_SPLIT':
         return configManager.getStrategyConfig('mintSplit').autoExecute
       case 'ARBITRAGE_LONG':
-      case 'ARBITRAGE_SHORT':
         return configManager.getStrategyConfig('arbitrage').autoExecute
       case 'MARKET_MAKING':
         return configManager.getStrategyConfig('marketMaking').autoExecute
@@ -264,14 +259,20 @@ export class StrategyDispatcher {
 
     // 计算价格总和
     const priceSum = prices.reduce((sum, p) => sum + p, 0)
+    const liquidity = market.liquidity || 0
 
-    // 1. Mint-Split 策略 - 多选项市场 + Bid总价 > 1
-    if (this.config.strategies.mintSplit && outcomeCount >= 3) {
-      if (priceSum > 1.005) { // 至少 0.5% 利润空间
-        const grossProfit = (priceSum - 1) * 10 // 假设 $10 铸造
+    // 1. Mint-Split 策略 - 读取配置的 minOutcomes 和 minPriceSum
+    const mintSplitConfig = getStrategyConfigManager().getStrategyConfig('mintSplit')
+    if (this.config.strategies.mintSplit && mintSplitConfig.enabled && outcomeCount >= mintSplitConfig.minOutcomes) {
+      // 检查流动性
+      if (liquidity < mintSplitConfig.minLiquidity) {
+        // 流动性不足，跳过
+      } else if (priceSum > mintSplitConfig.minPriceSum) {
+        const grossProfit = (priceSum - 1) * mintSplitConfig.mintAmount
         const netProfit = grossProfit * (1 - FEES.TAKER_FEE_PERCENT) - FEES.MIN_TX_COST
 
-        if (netProfit > 0.01) {
+        // 只要净利润为正就视为机会
+        if (netProfit > 0) {
           let confidence: ConfidenceLevel = 'LOW'
           if (priceSum > 1.02) confidence = 'HIGH'
           else if (priceSum > 1.01) confidence = 'MEDIUM'
@@ -280,21 +281,23 @@ export class StrategyDispatcher {
             strategy: 'MINT_SPLIT',
             confidence,
             estimatedProfit: netProfit,
-            reason: `${outcomeCount}选项市场, 价格和=${priceSum.toFixed(4)}, 预估利润$${netProfit.toFixed(4)}`,
+            reason: `${outcomeCount}选项市场, 价格和=${priceSum.toFixed(4)}, 流动性=$${liquidity.toFixed(0)}, 预估利润$${netProfit.toFixed(4)}`,
             score: CONFIDENCE_SCORES[confidence] + netProfit * 10,
           })
         }
       }
     }
 
-    // 2. Arbitrage 策略 - 二元市场
+    // 2. Arbitrage 策略 - 二元市场，读取配置参数
+    const arbitrageConfig = getStrategyConfigManager().getStrategyConfig('arbitrage')
     if (outcomeCount === 2) {
       // LONG: 买入总价 < 1
-      if (this.config.strategies.arbitrageLong && priceSum < 0.995) {
-        const grossProfit = (1 - priceSum) * 10
+      if (this.config.strategies.arbitrageLong && arbitrageConfig.long.enabled && priceSum < arbitrageConfig.long.maxPriceSum) {
+        const grossProfit = (1 - priceSum) * arbitrageConfig.tradeAmount
         const netProfit = grossProfit * (1 - FEES.TAKER_FEE_PERCENT) - FEES.MIN_TX_COST
+        const profitPercent = ((1 - priceSum) / priceSum) * 100
 
-        if (netProfit > 0.01) {
+        if (profitPercent >= arbitrageConfig.long.minSpread) {
           let confidence: ConfidenceLevel = 'LOW'
           if (priceSum < 0.98) confidence = 'HIGH'
           else if (priceSum < 0.99) confidence = 'MEDIUM'
@@ -309,35 +312,18 @@ export class StrategyDispatcher {
         }
       }
 
-      // SHORT: 卖出总价 > 1
-      if (this.config.strategies.arbitrageShort && priceSum > 1.005) {
-        const grossProfit = (priceSum - 1) * 10
-        const netProfit = grossProfit * (1 - FEES.TAKER_FEE_PERCENT) - FEES.MIN_TX_COST
-
-        if (netProfit > 0.01) {
-          let confidence: ConfidenceLevel = 'LOW'
-          if (priceSum > 1.02) confidence = 'HIGH'
-          else if (priceSum > 1.01) confidence = 'MEDIUM'
-
-          matches.push({
-            strategy: 'ARBITRAGE_SHORT',
-            confidence,
-            estimatedProfit: netProfit,
-            reason: `二元市场做空, 价格和=${priceSum.toFixed(4)}, 预估利润$${netProfit.toFixed(4)}`,
-            score: CONFIDENCE_SCORES[confidence] + netProfit * 10,
-          })
-        }
-      }
+      // SHORT 策略已移除，与 MintSplit 策略重复
     }
 
-    // 3. Market-Making 策略 - 高流动性市场
-    if (this.config.strategies.marketMaking) {
+    // 3. Market-Making 策略 - 高流动性市场，读取配置参数
+    const marketMakingConfig = getStrategyConfigManager().getStrategyConfig('marketMaking')
+    if (this.config.strategies.marketMaking && marketMakingConfig.enabled) {
       const liquidity = market.liquidity || 0
       const volume24hr = market.volume24hr || 0
 
-      if (liquidity >= 1000 && volume24hr >= 5000) {
+      if (liquidity >= marketMakingConfig.minLiquidity && volume24hr >= marketMakingConfig.minVolume24h) {
         const spread = market.spread || 0
-        if (spread > 0.02) { // 至少 2% 价差
+        if (spread > marketMakingConfig.spreadPercent / 100) {
           let confidence: ConfidenceLevel = 'LOW'
           if (liquidity > 10000 && spread > 0.05) confidence = 'HIGH'
           else if (liquidity > 5000 && spread > 0.03) confidence = 'MEDIUM'
@@ -480,7 +466,6 @@ export class StrategyDispatcher {
       byStrategy: {
         MINT_SPLIT: 0,
         ARBITRAGE_LONG: 0,
-        ARBITRAGE_SHORT: 0,
         MARKET_MAKING: 0,
       },
       lastDispatchAt: null,

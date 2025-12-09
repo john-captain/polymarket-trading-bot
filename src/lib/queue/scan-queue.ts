@@ -114,13 +114,14 @@ export class ScanQueue {
 
     // 监听队列事件
     this.queue.on('active', () => {
-      this.state = 'running'
+      if (this.state !== 'stopped' && this.state !== 'paused') {
+        this.state = 'running'
+      }
     })
 
     this.queue.on('idle', () => {
-      if (this.state === 'running') {
-        this.state = 'idle'
-      }
+      // 不再将状态改为 idle，保持 running 状态让循环继续
+      // this.state = 'idle' 会导致扫描循环退出
     })
 
     this.queue.on('error', (error) => {

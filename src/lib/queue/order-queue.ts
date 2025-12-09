@@ -157,7 +157,6 @@ export class OrderQueue {
     byStrategy: {
       MINT_SPLIT: { count: 0, volume: 0 },
       ARBITRAGE_LONG: { count: 0, volume: 0 },
-      ARBITRAGE_SHORT: { count: 0, volume: 0 },
       MARKET_MAKING: { count: 0, volume: 0 },
     } as Record<StrategyType, { count: number; volume: number }>,
     byType: {

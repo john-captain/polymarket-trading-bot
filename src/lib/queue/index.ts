@@ -179,15 +179,15 @@ export function initQueueSystem(): {
  * 启动队列系统
  */
 export async function startQueueSystem(): Promise<void> {
-  const { scanQueue, storageQueue } = initQueueSystem()
+  const scanQueue = getScanQueue()
+  // 暂不启动存储队列
+  // const storageQueue = getStorageQueue()
+  // storageQueue.start()
   
-  // 先启动存储队列
-  storageQueue.start()
-  
-  // 再启动扫描队列
+  // 启动扫描队列
   await scanQueue.start()
   
-  console.log('🚀 [QueueSystem] 队列系统已启动')
+  console.log('🚀 [QueueSystem] 队列系统已启动（仅策略队列）')
 }
 
 /**
@@ -195,13 +195,13 @@ export async function startQueueSystem(): Promise<void> {
  */
 export async function stopQueueSystem(): Promise<void> {
   const scanQueue = getScanQueue()
-  const storageQueue = getStorageQueue()
   
-  // 先停止扫描
+  // 停止扫描
   await scanQueue.stop()
   
-  // 等待存储队列处理完剩余数据
-  await storageQueue.stop()
+  // 暂不处理存储队列
+  // const storageQueue = getStorageQueue()
+  // await storageQueue.stop()
   
   console.log('⏹️ [QueueSystem] 队列系统已停止')
 }
@@ -251,8 +251,9 @@ export function getQueueSystemStatus() {
  * 连接所有队列的数据流
  */
 export function initStrategyQueueSystem() {
-  // 1. 初始化基础队列
-  const { scanQueue, storageQueue } = initQueueSystem()
+  // 1. 初始化扫描队列（暂不连接存储队列）
+  const scanQueue = getScanQueue()
+  const storageQueue = getStorageQueue()
   
   // 2. 初始化策略分发器
   const dispatcher = getStrategyDispatcher()
@@ -274,24 +275,20 @@ export function initStrategyQueueSystem() {
     await arbitrageQueue.handleTask(task, 'LONG')
   })
   
-  dispatcher.registerHandler('ARBITRAGE_SHORT', async (task) => {
-    await arbitrageQueue.handleTask(task, 'SHORT')
-  })
-  
   dispatcher.registerHandler('MARKET_MAKING', async (task) => {
     await marketMakingQueue.handleTask(task)
   })
   
-  // 6. 连接扫描 → 策略分发
+  // 6. 连接扫描 → 策略分发（暂停存储队列，只运行策略）
   scanQueue.setOnMarketsScanned(async (markets) => {
-    // 存储到数据库
-    await storageQueue.add(markets)
+    // 暂停存储到数据库，减少系统负担
+    // await storageQueue.add(markets)
     
     // 分发到策略队列
     await dispatcher.analyze(markets)
   })
   
-  console.log('✅ [QueueSystem] 完整策略队列系统已初始化')
+  console.log('✅ [QueueSystem] 策略队列系统已初始化（存储队列已暂停）')
   
   return {
     scanQueue,

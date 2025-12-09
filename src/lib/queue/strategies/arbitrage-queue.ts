@@ -1,9 +1,9 @@
 /**
  * Arbitrage 策略队列
  * 
- * 双边套利策略：
+ * 套利策略（仅 LONG）：
  * - LONG: 当 Ask 总价 < $1 时，买入所有选项，等待结算获利
- * - SHORT: 当 Bid 总价 > $1 时，卖出所有选项（可能需要先铸造）
+ * - SHORT 策略已移除，与 MintSplit 策略重复
  */
 
 import PQueue from 'p-queue'
@@ -14,9 +14,9 @@ import { getStrategyConfigManager, type ArbitrageConfig } from '../strategy-conf
 // ==================== 类型定义 ====================
 
 /**
- * 套利方向
+ * 套利方向 (仅保留 LONG)
  */
-export type ArbitrageDirection = 'LONG' | 'SHORT'
+export type ArbitrageDirection = 'LONG'
 
 /**
  * Arbitrage 机会
@@ -54,8 +54,6 @@ export interface ArbitrageOpportunity {
   status: 'detected' | 'pending' | 'executing' | 'executed' | 'failed' | 'expired'
   /** Token IDs */
   tokenIds?: string[]
-  /** 是否需要铸造 (SHORT 方向) */
-  needsMint?: boolean
 }
 
 /**
@@ -115,7 +113,6 @@ export class ArbitrageQueue {
   private stats = {
     totalDetected: 0,
     longDetected: 0,
-    shortDetected: 0,
     totalExecuted: 0,
     totalSuccess: 0,
     totalFailed: 0,
@@ -151,8 +148,7 @@ export class ArbitrageQueue {
 
       this.opportunities.set(opportunity.id, opportunity)
       this.stats.totalDetected++
-      if (direction === 'LONG') this.stats.longDetected++
-      else this.stats.shortDetected++
+      this.stats.longDetected++
 
       // 2. 检查冷却
       if (this.isInCooldown(opportunity.conditionId)) {
@@ -166,7 +162,7 @@ export class ArbitrageQueue {
       }
 
       // 3. 检查配置限制
-      const strategyType: StrategyType = direction === 'LONG' ? 'ARBITRAGE_LONG' : 'ARBITRAGE_SHORT'
+      const strategyType: StrategyType = 'ARBITRAGE_LONG'
       const canTrade = getStrategyConfigManager().canExecuteTrade(strategyType, opportunity.suggestedAmount)
       if (!canTrade.allowed) {
         opportunity.status = 'failed'
@@ -215,7 +211,7 @@ export class ArbitrageQueue {
   }
 
   /**
-   * 检测 Arbitrage 机会
+   * 检测 Arbitrage 机会 (仅 LONG)
    */
   detectOpportunity(market: MarketData, direction: ArbitrageDirection): ArbitrageOpportunity | null {
     const config = getStrategyConfigManager().getStrategyConfig('arbitrage')
@@ -234,25 +230,14 @@ export class ArbitrageQueue {
     let spread = 0
     let spreadPercent = 0
 
-    if (direction === 'LONG') {
-      // LONG: 买入总价 < 1
-      if (!config.long.enabled) return null
-      if (priceSum >= config.long.maxPriceSum) return null
+    // LONG: 买入总价 < 1
+    if (!config.long.enabled) return null
+    if (priceSum >= config.long.maxPriceSum) return null
 
-      spread = 1 - priceSum
-      spreadPercent = spread * 100
+    spread = 1 - priceSum
+    spreadPercent = spread * 100
 
-      if (spreadPercent < config.long.minSpread) return null
-    } else {
-      // SHORT: 卖出总价 > 1
-      if (!config.short.enabled) return null
-      if (priceSum <= config.short.minPriceSum) return null
-
-      spread = priceSum - 1
-      spreadPercent = spread * 100
-
-      if (spreadPercent < config.short.minSpread) return null
-    }
+    if (spreadPercent < config.long.minSpread) return null
 
     // 计算利润
     const tradeAmount = config.tradeAmount
@@ -283,7 +268,6 @@ export class ArbitrageQueue {
       detectedAt: new Date(),
       status: 'detected',
       tokenIds: market.clobTokenIds,
-      needsMint: direction === 'SHORT', // SHORT 可能需要铸造
     }
 
     console.log(
@@ -299,7 +283,7 @@ export class ArbitrageQueue {
    */
   generateExecutionPlan(opportunity: ArbitrageOpportunity, config: ArbitrageConfig): ArbitrageExecutionPlan {
     const tradeAmount = Math.min(opportunity.suggestedAmount, config.maxTradePerOrder)
-    const side = opportunity.direction === 'LONG' ? 'BUY' : 'SELL'
+    const side: 'BUY' | 'SELL' = 'BUY'  // LONG 策略只买入
 
     // 生成订单
     const orders = opportunity.outcomes.map((outcome, i) => ({
@@ -310,18 +294,14 @@ export class ArbitrageQueue {
       size: tradeAmount,
     }))
 
-    // SHORT 方向可能需要铸造
-    const needsMint = opportunity.direction === 'SHORT' && config.short.allowMint
-    const mintAmount = needsMint ? tradeAmount : undefined
-
     const expectedProfit = opportunity.netProfit * (tradeAmount / opportunity.suggestedAmount)
 
     return {
       opportunity,
       tradeAmount,
       orders,
-      needsMint,
-      mintAmount,
+      needsMint: false,  // LONG 策略不需要铸造
+      mintAmount: undefined,
       expectedProfit,
     }
   }
@@ -332,20 +312,31 @@ export class ArbitrageQueue {
   async executePlan(plan: ArbitrageExecutionPlan): Promise<ArbitrageResult> {
     const startTime = Date.now()
     const { opportunity } = plan
+    const txHashes: string[] = []
 
     try {
       opportunity.status = 'executing'
       console.log(`⚡ [ArbitrageQueue] 开始执行 ${opportunity.direction}: ${opportunity.id}`)
 
-      // TODO: 实际执行逻辑
-      // 1. 如果是 SHORT 且需要铸造，先铸造
-      // 2. 批量下单
-      // 3. 等待成交
+      // ==================== Step 0: 滑点检查 ====================
+      const config = getStrategyConfigManager().getStrategyConfig('arbitrage')
+      const currentPriceSum = opportunity.prices.reduce((sum, p) => sum + p, 0)
+      const expectedPriceSum = plan.orders.reduce((sum, o) => sum + o.price, 0)
+      const slippage = Math.abs(currentPriceSum - expectedPriceSum) / expectedPriceSum * 100
+      
+      if (slippage > config.maxSlippage) {
+        throw new Error(`滑点过大: ${slippage.toFixed(2)}% > 最大允许 ${config.maxSlippage}%`)
+      }
+      console.log(`   ✅ 滑点检查通过: ${slippage.toFixed(2)}% <= ${config.maxSlippage}%`)
+
+      // TODO: 完整实现
+      // 1. 批量下单 (LONG=买入所有选项)
+      // 2. 等待成交
 
       await new Promise(resolve => setTimeout(resolve, 1000))
 
       // 记录交易量
-      const strategyType: StrategyType = opportunity.direction === 'LONG' ? 'ARBITRAGE_LONG' : 'ARBITRAGE_SHORT'
+      const strategyType: StrategyType = 'ARBITRAGE_LONG'
       getStrategyConfigManager().recordTradeVolume(strategyType, plan.tradeAmount)
 
       this.setCooldown(opportunity.conditionId)

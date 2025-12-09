@@ -44,16 +44,15 @@ const navigation: NavItem[] = [
     title: "机会监控",
     href: "/opportunities",
     icon: Eye,
-    badge: "新",
+    // badge: "新",
   },
-  {
-    title: "市场",
-    icon: Search,
-    children: [
-      { title: "套利扫描", href: "/markets/scan", icon: Search, badge: "实时" },
-      { title: "市场列表", href: "/markets/sync", icon: Database },
-    ],
+    {
+    title: "市场列表",
+    href: "/markets/sync",
+    icon: Database,
+    // badge: "新",
   },
+
   {
     title: "策略",
     icon: Zap,

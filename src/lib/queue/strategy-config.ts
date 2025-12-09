@@ -23,8 +23,6 @@ export interface MintSplitConfig {
   // 触发条件
   /** 最小价格和阈值 (触发条件：价格和 > 此值) */
   minPriceSum: number
-  /** 最小预估利润 ($) */
-  minProfit: number
   /** 最少 outcome 数量 */
   minOutcomes: number
   /** 最小流动性 ($) */
@@ -46,7 +44,7 @@ export interface MintSplitConfig {
 }
 
 /**
- * Arbitrage 策略配置
+ * Arbitrage 策略配置 (仅 LONG)
  */
 export interface ArbitrageConfig {
   /** 是否启用 */
@@ -61,17 +59,6 @@ export interface ArbitrageConfig {
     maxPriceSum: number
     /** 最小价差 (%) */
     minSpread: number
-  }
-  
-  // SHORT 子策略 (卖出总价 > 1)
-  short: {
-    enabled: boolean
-    /** 最小卖出价格和 (触发条件：价格和 > 此值) */
-    minPriceSum: number
-    /** 最小价差 (%) */
-    minSpread: number
-    /** 是否允许铸造 (无持仓时) */
-    allowMint: boolean
   }
   
   // 交易参数
@@ -155,7 +142,6 @@ export const DEFAULT_MINT_SPLIT_CONFIG: MintSplitConfig = {
   enabled: true,
   autoExecute: false,
   minPriceSum: 1.005,
-  minProfit: 0.02,
   minOutcomes: 2,
   minLiquidity: 100,
   mintAmount: 10,
@@ -172,12 +158,6 @@ export const DEFAULT_ARBITRAGE_CONFIG: ArbitrageConfig = {
     enabled: true,
     maxPriceSum: 0.995,
     minSpread: 0.5,
-  },
-  short: {
-    enabled: true,
-    minPriceSum: 1.005,
-    minSpread: 0.5,
-    allowMint: true,
   },
   tradeAmount: 10,
   maxSlippage: 0.5,
@@ -258,9 +238,6 @@ class StrategyConfigManager {
       if (updates.arbitrage.long) {
         this.config.arbitrage.long = { ...this.config.arbitrage.long, ...updates.arbitrage.long }
       }
-      if (updates.arbitrage.short) {
-        this.config.arbitrage.short = { ...this.config.arbitrage.short, ...updates.arbitrage.short }
-      }
     }
     if (updates.marketMaking) {
       this.config.marketMaking = { ...this.config.marketMaking, ...updates.marketMaking }
@@ -292,9 +269,6 @@ class StrategyConfigManager {
         break
       case 'ARBITRAGE_LONG':
         this.config.arbitrage.long.enabled = enabled
-        break
-      case 'ARBITRAGE_SHORT':
-        this.config.arbitrage.short.enabled = enabled
         break
       case 'MARKET_MAKING':
         this.config.marketMaking.enabled = enabled
@@ -367,15 +341,11 @@ class StrategyConfigManager {
         break
       
       case 'ARBITRAGE_LONG':
-      case 'ARBITRAGE_SHORT':
         if (!this.config.arbitrage.enabled) {
           return { allowed: false, reason: 'Arbitrage 策略已禁用' }
         }
-        if (strategy === 'ARBITRAGE_LONG' && !this.config.arbitrage.long.enabled) {
+        if (!this.config.arbitrage.long.enabled) {
           return { allowed: false, reason: 'Arbitrage LONG 已禁用' }
-        }
-        if (strategy === 'ARBITRAGE_SHORT' && !this.config.arbitrage.short.enabled) {
-          return { allowed: false, reason: 'Arbitrage SHORT 已禁用' }
         }
         if (amount > this.config.arbitrage.maxTradePerOrder) {
           return { allowed: false, reason: `超过单次最大交易量 $${this.config.arbitrage.maxTradePerOrder}` }
@@ -406,7 +376,6 @@ class StrategyConfigManager {
         this.dailyStats.mintSplitVolume += amount
         break
       case 'ARBITRAGE_LONG':
-      case 'ARBITRAGE_SHORT':
         this.dailyStats.arbitrageVolume += amount
         break
       case 'MARKET_MAKING':
@@ -487,7 +456,6 @@ class StrategyConfigManager {
           ...DEFAULT_ARBITRAGE_CONFIG, 
           ...parsed.arbitrage,
           long: { ...DEFAULT_ARBITRAGE_CONFIG.long, ...parsed.arbitrage?.long },
-          short: { ...DEFAULT_ARBITRAGE_CONFIG.short, ...parsed.arbitrage?.short },
         },
         marketMaking: { ...DEFAULT_MARKET_MAKING_CONFIG, ...parsed.marketMaking },
         global: { ...DEFAULT_STRATEGY_CONFIG.global, ...parsed.global },

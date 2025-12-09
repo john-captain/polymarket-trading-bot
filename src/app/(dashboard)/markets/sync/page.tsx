@@ -503,15 +503,18 @@ export default function MarketSyncPage() {
                           {prices.length >= 2 ? (
                             <div className="flex flex-col gap-1">
                               <span className="font-mono text-sm">
-                                <span className="text-green-600 font-semibold">{outcomes[0] || 'Yes'}: {(prices[0] * 100).toFixed(0)}¢</span>
+                                <span className="text-green-600 font-semibold">{outcomes[0] || 'Yes'}: {(prices[0] * 100).toFixed(2)}¢</span>
                               </span>
                               <span className="font-mono text-sm">
-                                <span className="text-red-600 font-semibold">{outcomes[1] || 'No'}: {(prices[1] * 100).toFixed(0)}¢</span>
+                                <span className="text-red-600 font-semibold">{outcomes[1] || 'No'}: {(prices[1] * 100).toFixed(2)}¢</span>
+                              </span>
+                              <span className="font-mono text-xs text-muted-foreground">
+                                Σ = {(prices.reduce((a, b) => a + b, 0) * 100).toFixed(2)}¢
                               </span>
                             </div>
                           ) : prices.length === 1 ? (
                             <span className="font-mono text-lg font-semibold">
-                              {(prices[0] * 100).toFixed(0)}¢
+                              {(prices[0] * 100).toFixed(2)}¢
                             </span>
                           ) : '-'}
                         </TableCell>

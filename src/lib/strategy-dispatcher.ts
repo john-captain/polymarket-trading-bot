@@ -71,7 +71,7 @@ export interface ScannedMarket {
 }
 
 export interface StrategyMatch {
-  strategy: "MINT_SPLIT" | "ARBITRAGE_LONG" | "ARBITRAGE_SHORT" | "MARKET_MAKING"
+  strategy: "MINT_SPLIT" | "ARBITRAGE_LONG" | "MARKET_MAKING"
   confidence: "HIGH" | "MEDIUM" | "LOW"
   estimatedProfit: number
   reason: string
@@ -312,24 +312,7 @@ function matchStrategies(market: ScannedMarket): StrategyMatch[] {
         })
       }
     }
-
-    // 做空: Bid总价 > 1
-    if (config.arbitrage.shortEnabled && market.realBidSum > 1 + spreadThreshold) {
-      const grossProfit = (market.realBidSum - 1) * config.arbitrage.tradeAmount
-      const netProfit = grossProfit * (1 - FEES.TAKER_FEE_PERCENT / 100) - 0.01
-
-      if (netProfit > 0) {
-        const minBidSize = Math.min(...market.bidSizes)
-        const confidence = minBidSize >= config.arbitrage.tradeAmount ? "HIGH" : "MEDIUM"
-
-        matches.push({
-          strategy: "ARBITRAGE_SHORT",
-          confidence,
-          estimatedProfit: netProfit,
-          reason: `Bid总价=${market.realBidSum.toFixed(4)}, 价差=${((market.realBidSum - 1) * 100).toFixed(2)}%`,
-        })
-      }
-    }
+    // SHORT 策略已移除，使用 MintSplit 替代 (priceSum > 1 时铸造卖出)
   }
 
   // 3. 做市策略 - 高流动性市场
@@ -400,7 +383,6 @@ async function executeStrategy(task: DispatchResult): Promise<{ success: boolean
       return await executeMintSplitStrategy(task.market)
     
     case "ARBITRAGE_LONG":
-    case "ARBITRAGE_SHORT":
       // 调用双边套利执行
       return await executeArbitrageStrategy(task.market, task.strategy)
     
@@ -502,7 +484,6 @@ export async function runUnifiedScan(): Promise<{
     const byStrategy: Record<string, number> = {
       MINT_SPLIT: 0,
       ARBITRAGE_LONG: 0,
-      ARBITRAGE_SHORT: 0,
       MARKET_MAKING: 0,
     }
 
@@ -530,7 +511,6 @@ export async function runUnifiedScan(): Promise<{
     addLog("SUCCESS", `扫描完成! 发现 ${opportunities.length} 个机会`)
     addLog("INFO", `  - 铸造拆分: ${byStrategy.MINT_SPLIT} 个`)
     addLog("INFO", `  - 做多套利: ${byStrategy.ARBITRAGE_LONG} 个`)
-    addLog("INFO", `  - 做空套利: ${byStrategy.ARBITRAGE_SHORT} 个`)
     addLog("INFO", `  - 做市机会: ${byStrategy.MARKET_MAKING} 个`)
 
     // 3. 如果启用自动执行，将高置信度机会加入队列

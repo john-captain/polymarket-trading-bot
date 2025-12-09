@@ -1291,7 +1291,7 @@ export async function cleanOldApiRequestLogs(daysToKeep: number = 7): Promise<nu
 /**
  * 策略类型
  */
-export type OpportunityStrategyType = 'MINT_SPLIT' | 'ARBITRAGE_LONG' | 'ARBITRAGE_SHORT' | 'MARKET_MAKING'
+export type OpportunityStrategyType = 'MINT_SPLIT' | 'ARBITRAGE_LONG' | 'MARKET_MAKING'
 
 /**
  * 机会状态

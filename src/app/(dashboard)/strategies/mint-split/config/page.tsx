@@ -41,7 +41,6 @@ interface MintSplitConfig {
     enabled: boolean
     autoExecute: boolean
     minPriceSum: number
-    minProfit: number
     minOutcomes: number
     minLiquidity: number
     mintAmount: number
@@ -271,18 +270,6 @@ function MintSplitConfigForm({
                             />
                             <p className="text-xs text-muted-foreground">
                                 价格和 &gt; 此值时触发（推荐 1.005）
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>最小预期利润 ($)</Label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                value={localConfig.minProfit}
-                                onChange={(e) => updateField('minProfit', parseFloat(e.target.value))}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                预期利润低于此值时跳过
                             </p>
                         </div>
                         <div className="space-y-2">

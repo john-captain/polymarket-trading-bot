@@ -246,8 +246,8 @@ export class MintSplitQueue {
     const grossProfit = (priceSum - 1) * config.mintAmount
     const netProfit = grossProfit * (1 - FEES.TAKER_FEE_PERCENT / 100) - FEES.MIN_TX_COST
 
-    // 检查最小利润
-    if (netProfit < config.minProfit) {
+    // 只要净利润为正就视为机会
+    if (netProfit <= 0) {
       return null
     }
 
@@ -341,6 +341,17 @@ export class MintSplitQueue {
       if (!process.env.PRIVATE_KEY) {
         throw new Error('未配置 PRIVATE_KEY 环境变量')
       }
+
+      // ==================== Step 0: 滑点检查 ====================
+      const config = getStrategyConfigManager().getStrategyConfig('mintSplit')
+      const currentPriceSum = opportunity.prices.reduce((sum, p) => sum + p, 0)
+      const expectedPriceSum = plan.sellOrders.reduce((sum, o) => sum + o.price, 0)
+      const slippage = Math.abs(currentPriceSum - expectedPriceSum) / expectedPriceSum * 100
+      
+      if (slippage > config.maxSlippage) {
+        throw new Error(`滑点过大: ${slippage.toFixed(2)}% > 最大允许 ${config.maxSlippage}%`)
+      }
+      console.log(`   ✅ 滑点检查通过: ${slippage.toFixed(2)}% <= ${config.maxSlippage}%`)
 
       // ==================== Step 1: 铸造代币 ====================
       console.log(`\n🔨 [MintSplitQueue] Step 1: 铸造代币...`)

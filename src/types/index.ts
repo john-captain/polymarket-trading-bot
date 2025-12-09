@@ -111,7 +111,6 @@ export interface ScanStats {
 
 export interface ArbitrageSettings {
   minSpread: number
-  minProfit: number
   tradeAmount: number
   scanInterval: number
   autoTrade: boolean
@@ -140,8 +139,6 @@ export interface MintSplitSettings {
   enabled: boolean
   // 最小价差触发点 (例如 1.02 表示总价 > $1.02 时触发)
   minPriceSum: number
-  // 最小预期利润 (美元)
-  minProfit: number
   // 每次铸造金额 (USDC)
   mintAmount: number
   // 扫描间隔 (毫秒)

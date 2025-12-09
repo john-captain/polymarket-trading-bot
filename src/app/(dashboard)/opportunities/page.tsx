@@ -135,7 +135,6 @@ const statusLabels: Record<string, string> = {
 const strategyLabels: Record<string, string> = {
   MINT_SPLIT: '铸造拆分',
   ARBITRAGE_LONG: '套利-做多',
-  ARBITRAGE_SHORT: '套利-做空',
   MARKET_MAKING: '做市',
 }
 
@@ -346,7 +345,6 @@ export default function OpportunitiesPage() {
                 <SelectItem value="all">全部策略</SelectItem>
                 <SelectItem value="MINT_SPLIT">铸造拆分</SelectItem>
                 <SelectItem value="ARBITRAGE_LONG">套利-做多</SelectItem>
-                <SelectItem value="ARBITRAGE_SHORT">套利-做空</SelectItem>
                 <SelectItem value="MARKET_MAKING">做市</SelectItem>
               </SelectContent>
             </Select>

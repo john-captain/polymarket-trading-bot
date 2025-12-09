@@ -35,7 +35,6 @@ interface ExtendedMintSplitSettings extends MintSplitSettings {
 export const defaultMintSplitSettings: ExtendedMintSplitSettings = {
   enabled: false,
   minPriceSum: 1.005,  // 总价 > $1.005 时触发 (0.5% 利润)
-  minProfit: 0.01,     // 最小 $0.01 利润
   mintAmount: 10,      // 每次铸造 $10
   scanInterval: 2000,  // 2秒扫描一次
   minLiquidity: 100,   // 最小 $100 流动性
@@ -262,7 +261,8 @@ async function analyzeMintSplitOpportunity(market: any): Promise<MintSplitOpport
       return null
     }
 
-    if (expectedProfit < currentSettings.minProfit) {
+    // 只要净利润为正就视为机会
+    if (expectedProfit <= 0) {
       return null
     }
 
@@ -487,7 +487,6 @@ export function startMintSplitStrategy(settings?: Partial<MintSplitSettings>) {
   
   addLog("SUCCESS", "铸造拆分策略已启动", {
     minPriceSum: currentSettings.minPriceSum,
-    minProfit: currentSettings.minProfit,
     mintAmount: currentSettings.mintAmount,
     scanInterval: currentSettings.scanInterval,
   })
@@ -568,8 +567,8 @@ export async function simulateMintSplitTrade(opportunity: MintSplitOpportunity):
 }> {
   addLog("INFO", `模拟执行: ${opportunity.question.slice(0, 50)}...`)
 
-  // 模拟检查
-  if (opportunity.expectedProfit < currentSettings.minProfit) {
+  // 模拟检查 - 只要净利润为正即可
+  if (opportunity.expectedProfit <= 0) {
     return { success: false, error: "利润不足" }
   }
 
