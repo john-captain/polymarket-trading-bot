@@ -196,6 +196,38 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 ```
 
+### 6. 统一筛选配置（强制）
+所有筛选条件、排序选项、分类选项必须使用统一配置文件 `src/lib/filter-config.ts`：
+
+```typescript
+import {
+  // 选项配置
+  MARKET_STATUS_OPTIONS,      // 市场状态: 全部/活跃/已关闭
+  MARKET_SORT_OPTIONS,        // 排序选项: 交易量/流动性/结束时间等
+  MARKET_CATEGORY_OPTIONS,    // 市场分类: 加密货币/体育/政治等
+  
+  // 筛选字段定义
+  NUMERIC_FILTER_FIELDS,      // 数值筛选: 流动性/交易量范围
+  DATE_FILTER_FIELDS,         // 日期筛选: 结束时间范围
+  
+  // 工具函数
+  buildApiParams,             // 构建前端 API 请求参数
+  buildGammaParams,           // 构建 Gamma API 参数
+  buildDbParams,              // 构建数据库查询参数
+  parseUrlParams,             // 解析 URL 查询参数
+  hasAdvancedFilters,         // 检查是否有高级筛选
+  getSortConfig,              // 获取排序配置
+  
+  // 类型
+  type FilterConfig,
+  type MarketStatusValue,
+  type MarketSortValue,
+  type MarketCategoryValue,
+} from '@/lib/filter-config'
+```
+
+**禁止**在页面或组件中硬编码筛选选项，统一从配置导入。
+
 ## 代码规范
 
 ### 前端规范 (React/Next.js)

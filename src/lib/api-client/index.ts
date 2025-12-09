@@ -55,31 +55,25 @@ export { GammaClient, getGammaClient, resetGammaClient } from './gamma'
 // CLOB 客户端导出
 export { ClobClientWrapper, getClobClient, resetClobClient } from './clob'
 
-// 数据库日志存储导出
-import { saveApiRequestLog, type ApiRequestLogRecord } from '@/lib/database'
-import { setLogStorage, type LogStorage } from './base'
-import { getClobClient } from './clob'
+// 文件日志存储导出
+export { 
+  FileLogStorage, 
+  getFileLogStorage, 
+  getApiLogs, 
+  getApiLogStats, 
+  clearApiLogs 
+} from './file-log-storage'
 
-/**
- * 数据库日志存储实现
- */
-class DatabaseLogStorage implements LogStorage {
-  async saveLog(log: any): Promise<void> {
-    try {
-      await saveApiRequestLog(log as ApiRequestLogRecord)
-    } catch (error) {
-      // 日志保存失败不应影响主流程
-      console.error('❌ 保存 API 日志到数据库失败:', error)
-    }
-  }
-}
+import { setLogStorage } from './base'
+import { getClobClient } from './clob'
+import { getFileLogStorage } from './file-log-storage'
 
 /**
  * 初始化 API 客户端
- * 设置日志存储到数据库
+ * 设置日志存储到文件（轻量级，不增加数据库负担）
  */
 export async function initApiClients(): Promise<void> {
-  const logStorage = new DatabaseLogStorage()
+  const logStorage = getFileLogStorage()
   
   // 设置全局日志存储
   setLogStorage(logStorage)
@@ -87,7 +81,7 @@ export async function initApiClients(): Promise<void> {
   // 设置 CLOB 客户端日志存储
   getClobClient().setLogStorage(logStorage)
   
-  console.log('✅ API 客户端已初始化，日志将记录到数据库')
+  console.log('✅ API 客户端已初始化，日志将记录到文件')
 }
 
 /**

@@ -266,8 +266,8 @@ export default function OverviewPage() {
         {/* 活动日志 */}
         <Card>
           <CardHeader>
-            <CardTitle>活动日志</CardTitle>
-            <CardDescription>最近的系统活动（最新 20 条）</CardDescription>
+            <CardTitle>API 调用日志</CardTitle>
+            <CardDescription>最近的 Gamma/CLOB API 调用（最新 20 条）</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -276,20 +276,23 @@ export default function OverviewPage() {
                   暂无活动日志
                 </p>
               ) : (
-                logs.slice(0, 20).map((log: string, i: number) => (
+                logs.slice(0, 20).map((log: any, i: number) => (
                   <div
                     key={i}
-                    className={`text-sm py-2 px-3 rounded-lg ${
-                      log.includes("✅") || log.includes("成功")
-                        ? "bg-success/10 text-success"
-                        : log.includes("❌") || log.includes("错误")
-                        ? "bg-destructive/10 text-destructive"
-                        : log.includes("💡") || log.includes("机会")
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted/50 text-muted-foreground"
+                    className={`text-sm py-2 px-3 rounded-lg flex items-center gap-2 ${
+                      log.success
+                        ? "bg-green-50 text-green-700"
+                        : "bg-red-50 text-red-700"
                     }`}
                   >
-                    {log}
+                    <span className={`w-2 h-2 rounded-full ${log.success ? "bg-green-500" : "bg-red-500"}`} />
+                    <span className="text-xs text-muted-foreground w-16">{log.durationMs}ms</span>
+                    <span className="font-mono text-xs truncate flex-1">
+                      [{log.clientType}] {log.method} {log.endpoint}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(log.createdAt).toLocaleTimeString('zh-CN')}
+                    </span>
                   </div>
                 ))
               )}

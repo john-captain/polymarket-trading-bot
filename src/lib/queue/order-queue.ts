@@ -557,18 +557,22 @@ export class OrderQueue {
 
 // ==================== 单例导出 ====================
 
-let orderQueueInstance: OrderQueue | null = null
+// 使用 globalThis 防止开发模式热重载时丢失状态
+const globalForOrderQueue = globalThis as unknown as {
+  orderQueueInstance: OrderQueue | undefined
+}
 
 export function getOrderQueue(): OrderQueue {
-  if (!orderQueueInstance) {
-    orderQueueInstance = new OrderQueue()
+  if (!globalForOrderQueue.orderQueueInstance) {
+    globalForOrderQueue.orderQueueInstance = new OrderQueue()
+    console.log('✅ [OrderQueue] 交易执行队列已初始化')
   }
-  return orderQueueInstance
+  return globalForOrderQueue.orderQueueInstance
 }
 
 export function resetOrderQueue(): void {
-  if (orderQueueInstance) {
-    orderQueueInstance.clear()
+  if (globalForOrderQueue.orderQueueInstance) {
+    globalForOrderQueue.orderQueueInstance.clear()
   }
-  orderQueueInstance = null
+  globalForOrderQueue.orderQueueInstance = undefined
 }

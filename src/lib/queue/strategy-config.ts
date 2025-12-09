@@ -156,7 +156,7 @@ export const DEFAULT_MINT_SPLIT_CONFIG: MintSplitConfig = {
   autoExecute: false,
   minPriceSum: 1.005,
   minProfit: 0.02,
-  minOutcomes: 3,
+  minOutcomes: 2,
   minLiquidity: 100,
   mintAmount: 10,
   maxSlippage: 0.5,

@@ -14,6 +14,7 @@
  */
 
 import type { MarketData, QueueEventType } from './types'
+import { getStrategyConfigManager } from './strategy-config'
 
 // ==================== 类型定义 ====================
 
@@ -212,13 +213,41 @@ export class StrategyDispatcher {
 
       tasks.push(task)
 
-      // 自动分发
-      if (this.config.autoDispatch && bestMatch) {
-        await this.dispatch(task)
+      // 根据策略配置的 autoExecute 决定是否自动分发
+      if (bestMatch) {
+        const shouldAutoDispatch = this.shouldAutoDispatch(bestMatch.strategy)
+        if (shouldAutoDispatch) {
+          await this.dispatch(task)
+        }
       }
     }
 
     return tasks
+  }
+
+  /**
+   * 判断是否应该自动分发
+   * 根据策略配置的 autoExecute 或分发器的 autoDispatch 配置
+   */
+  private shouldAutoDispatch(strategy: StrategyType): boolean {
+    // 如果分发器全局开启了 autoDispatch，则自动分发
+    if (this.config.autoDispatch) {
+      return true
+    }
+
+    // 否则检查具体策略的 autoExecute 配置
+    const configManager = getStrategyConfigManager()
+    switch (strategy) {
+      case 'MINT_SPLIT':
+        return configManager.getStrategyConfig('mintSplit').autoExecute
+      case 'ARBITRAGE_LONG':
+      case 'ARBITRAGE_SHORT':
+        return configManager.getStrategyConfig('arbitrage').autoExecute
+      case 'MARKET_MAKING':
+        return configManager.getStrategyConfig('marketMaking').autoExecute
+      default:
+        return false
+    }
   }
 
   /**
@@ -493,21 +522,25 @@ export class StrategyDispatcher {
 
 // ==================== 单例导出 ====================
 
-let dispatcherInstance: StrategyDispatcher | null = null
+// 使用 globalThis 防止开发模式热重载时丢失状态
+const globalForDispatcher = globalThis as unknown as {
+  dispatcherInstance: StrategyDispatcher | undefined
+}
 
 /**
  * 获取策略分发器单例
  */
 export function getStrategyDispatcher(): StrategyDispatcher {
-  if (!dispatcherInstance) {
-    dispatcherInstance = new StrategyDispatcher()
+  if (!globalForDispatcher.dispatcherInstance) {
+    globalForDispatcher.dispatcherInstance = new StrategyDispatcher()
+    console.log('✅ [StrategyDispatcher] 策略分发器已初始化')
   }
-  return dispatcherInstance
+  return globalForDispatcher.dispatcherInstance
 }
 
 /**
  * 重置策略分发器单例
  */
 export function resetStrategyDispatcher(): void {
-  dispatcherInstance = null
+  globalForDispatcher.dispatcherInstance = undefined
 }

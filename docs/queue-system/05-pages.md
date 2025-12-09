@@ -251,7 +251,7 @@
 | `enabled` | boolean | true | 是否启用策略 |
 | `minPriceSum` | number | 1.005 | 最小价格和阈值 (>1 才有利润) |
 | `minProfitRate` | number | 0.5% | 最小利润率 |
-| `minOutcomes` | number | 3 | 最小结果数量 |
+| `minOutcomes` | number | 2 | 最小结果数量 |
 | `mintAmount` | number | 10 | 每次铸造金额 (USDC) |
 | `maxSlippage` | number | 1% | 最大允许滑点 |
 | `cooldownSeconds` | number | 60 | 同市场冷却时间 |

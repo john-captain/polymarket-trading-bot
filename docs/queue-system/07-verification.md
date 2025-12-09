@@ -22,12 +22,12 @@
 
 ### 2.1 API 请求层验收 ⭐
 
-- [ ] 所有第三方 API 调用通过统一客户端
-- [ ] 每次请求自动记录到 `api_request_logs` 表
-- [ ] 限速生效：Gamma 10/秒, CLOB 5/秒
-- [ ] 网络错误自动重试 (429/5xx)
-- [ ] 代理配置生效 (HTTP/SOCKS)
-- [ ] Settings 页面可查看 API 日志
+- [x] 所有第三方 API 调用通过统一客户端
+- [x] 每次请求自动记录到 `api_request_logs` 表
+- [x] 限速生效：Gamma 10/秒, CLOB 5/秒
+- [x] 网络错误自动重试 (429/5xx)
+- [x] 代理配置生效 (HTTP/SOCKS)
+- [x] Settings 页面可查看 API 日志
 
 ### 2.2 市场列表页面验收 ⭐
 

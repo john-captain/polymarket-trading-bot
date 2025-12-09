@@ -99,7 +99,6 @@ export class ScanQueue {
   private processedCount = 0
   private errorCount = 0
   private lastTaskAt: Date | null = null
-  private scanLoopTimer: NodeJS.Timeout | null = null
   private eventListeners: QueueEventListener[] = []
   
   // 回调函数
@@ -282,7 +281,7 @@ export class ScanQueue {
    * 启动循环扫描
    */
   start(): void {
-    if (this.state === 'running' || this.scanLoopTimer) {
+    if (this.state === 'running') {
       console.log('⚠️ [ScanQueue] 扫描已在运行中')
       return
     }
@@ -291,28 +290,30 @@ export class ScanQueue {
     console.log('🚀 [ScanQueue] 启动循环扫描')
     
     // 立即执行一次
-    this.scanLoop()
+    this.runScanLoop()
   }
 
   /**
-   * 扫描循环
+   * 扫描循环 - 持续运行
    */
-  private async scanLoop(): Promise<void> {
-    if (this.state !== 'running') {
-      return
-    }
+  private async runScanLoop(): Promise<void> {
+    while (this.state === 'running') {
+      try {
+        console.log('🔄 [ScanQueue] 开始新一轮扫描...')
+        await this.addScanTask()
+      } catch (error) {
+        console.error('❌ [ScanQueue] 扫描循环错误:', error)
+      }
 
-    try {
-      await this.addScanTask()
-    } catch (error) {
-      console.error('❌ [ScanQueue] 扫描循环错误:', error)
+      // 等待间隔后继续下一轮
+      if (this.state === 'running') {
+        const config = getScanConfig()
+        console.log(`⏰ [ScanQueue] 等待 ${config.scanInterval / 1000} 秒后开始下一轮扫描...`)
+        await this.sleep(config.scanInterval)
+      }
     }
-
-    // 设置下一次扫描
-    if (this.state === 'running') {
-      const config = getScanConfig()
-      this.scanLoopTimer = setTimeout(() => this.scanLoop(), config.scanInterval)
-    }
+    
+    console.log('🛑 [ScanQueue] 扫描循环已退出，当前状态:', this.state)
   }
 
   /**
@@ -321,12 +322,6 @@ export class ScanQueue {
   stop(): void {
     console.log('🛑 [ScanQueue] 停止扫描')
     this.state = 'stopped'
-    
-    if (this.scanLoopTimer) {
-      clearTimeout(this.scanLoopTimer)
-      this.scanLoopTimer = null
-    }
-
     this.queue.clear()
   }
 
@@ -337,11 +332,6 @@ export class ScanQueue {
     console.log('⏸️ [ScanQueue] 暂停扫描')
     this.state = 'paused'
     this.queue.pause()
-    
-    if (this.scanLoopTimer) {
-      clearTimeout(this.scanLoopTimer)
-      this.scanLoopTimer = null
-    }
   }
 
   /**
@@ -356,7 +346,7 @@ export class ScanQueue {
     console.log('▶️ [ScanQueue] 恢复扫描')
     this.state = 'running'
     this.queue.start()
-    this.scanLoop()
+    this.runScanLoop()
   }
 
   /**
@@ -393,24 +383,29 @@ export class ScanQueue {
 
 // ==================== 单例导出 ====================
 
-let scanQueueInstance: ScanQueue | null = null
+// 使用 globalThis 防止开发模式热重载时丢失状态
+const globalForScanQueue = globalThis as unknown as {
+  scanQueueInstance: ScanQueue | undefined
+}
 
 /**
  * 获取扫描队列单例
  */
 export function getScanQueue(): ScanQueue {
-  if (!scanQueueInstance) {
-    scanQueueInstance = new ScanQueue()
+  if (!globalForScanQueue.scanQueueInstance) {
+    globalForScanQueue.scanQueueInstance = new ScanQueue()
+    console.log('✅ [ScanQueue] 扫描队列已初始化')
   }
-  return scanQueueInstance
+  return globalForScanQueue.scanQueueInstance
 }
 
 /**
  * 重置扫描队列单例 (用于测试)
  */
 export function resetScanQueue(): void {
-  if (scanQueueInstance) {
-    scanQueueInstance.stop()
-    scanQueueInstance = null
+  if (globalForScanQueue.scanQueueInstance) {
+    globalForScanQueue.scanQueueInstance.stop()
+    globalForScanQueue.scanQueueInstance = undefined
   }
 }
+

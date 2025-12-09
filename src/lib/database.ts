@@ -18,7 +18,7 @@ const dbConfig = {
   database: process.env.DB_NAME || "polymarket",
   charset: "utf8mb4",
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 20,
   queueLimit: 0,
 }
 
@@ -653,6 +653,13 @@ export async function getMarkets(options: {
   search?: string
   orderBy?: string
   orderDir?: 'ASC' | 'DESC'
+  // 高级筛选参数
+  liquidityMin?: number
+  liquidityMax?: number
+  volumeMin?: number
+  volumeMax?: number
+  endDateMin?: string
+  endDateMax?: string
 } = {}): Promise<{ markets: MarketRecord[]; total: number }> {
   const p = getPool()
   const {
@@ -662,7 +669,13 @@ export async function getMarkets(options: {
     category,
     search,
     orderBy = 'updated_at',
-    orderDir = 'DESC'
+    orderDir = 'DESC',
+    liquidityMin,
+    liquidityMax,
+    volumeMin,
+    volumeMax,
+    endDateMin,
+    endDateMax,
   } = options
   
   let whereClause = '1=1'
@@ -681,6 +694,36 @@ export async function getMarkets(options: {
   if (search) {
     whereClause += ' AND (question LIKE ? OR slug LIKE ?)'
     params.push(`%${search}%`, `%${search}%`)
+  }
+  
+  // 高级筛选：流动性范围
+  if (liquidityMin !== undefined && !isNaN(liquidityMin)) {
+    whereClause += ' AND liquidity >= ?'
+    params.push(liquidityMin)
+  }
+  if (liquidityMax !== undefined && !isNaN(liquidityMax)) {
+    whereClause += ' AND liquidity <= ?'
+    params.push(liquidityMax)
+  }
+  
+  // 高级筛选：交易量范围
+  if (volumeMin !== undefined && !isNaN(volumeMin)) {
+    whereClause += ' AND volume >= ?'
+    params.push(volumeMin)
+  }
+  if (volumeMax !== undefined && !isNaN(volumeMax)) {
+    whereClause += ' AND volume <= ?'
+    params.push(volumeMax)
+  }
+  
+  // 高级筛选：结束时间范围
+  if (endDateMin) {
+    whereClause += ' AND end_date >= ?'
+    params.push(endDateMin)
+  }
+  if (endDateMax) {
+    whereClause += ' AND end_date <= ?'
+    params.push(endDateMax)
   }
   
   // 获取总数
@@ -770,7 +813,6 @@ export async function getMarketsStats(): Promise<{
     WHERE category IS NOT NULL AND category != ''
     GROUP BY category 
     ORDER BY count DESC
-    LIMIT 20
   `)
   
   return {
@@ -1242,4 +1284,621 @@ export async function cleanOldApiRequestLogs(daysToKeep: number = 7): Promise<nu
   const deleted = (result as any).affectedRows
   console.log(`🗑️ 已清理 ${deleted} 条旧 API 请求日志`)
   return deleted
+}
+
+// ==================== 套利机会 (Opportunities) ====================
+
+/**
+ * 策略类型
+ */
+export type OpportunityStrategyType = 'MINT_SPLIT' | 'ARBITRAGE_LONG' | 'ARBITRAGE_SHORT' | 'MARKET_MAKING'
+
+/**
+ * 机会状态
+ */
+export type OpportunityStatus = 'PENDING' | 'QUEUED' | 'EXECUTING' | 'PARTIAL' | 'SUCCESS' | 'FAILED' | 'EXPIRED' | 'CANCELLED'
+
+/**
+ * Token 详情
+ */
+export interface OpportunityTokenDetail {
+  tokenId: string
+  outcome: string
+  price: number
+  size: number
+  filled?: number
+  status?: 'pending' | 'filled' | 'partial' | 'failed'
+}
+
+/**
+ * 执行步骤
+ */
+export interface ExecutionStep {
+  step: number
+  action: string
+  status: 'pending' | 'executing' | 'success' | 'failed'
+  timestamp?: Date
+  txHash?: string
+  error?: string
+  details?: Record<string, any>
+}
+
+/**
+ * 机会记录（完整版）
+ */
+export interface OpportunityFullRecord {
+  id?: number
+  conditionId: string
+  question: string
+  slug?: string
+  strategyType: OpportunityStrategyType
+  priceSum?: number
+  spread?: number
+  expectedProfit?: number
+  actualProfit?: number
+  investmentAmount?: number
+  maxTradeable?: number
+  tokens?: OpportunityTokenDetail[]
+  status: OpportunityStatus
+  executionSteps?: ExecutionStep[]
+  tradeId?: number
+  orderIds?: string[]
+  txHashes?: string[]
+  errorMessage?: string
+  retryCount?: number
+  createdAt?: Date
+  queuedAt?: Date
+  startedAt?: Date
+  completedAt?: Date
+}
+
+/**
+ * 保存套利机会
+ */
+export async function saveOpportunityFull(opp: OpportunityFullRecord): Promise<number> {
+  const p = getPool()
+  const sql = `
+    INSERT INTO opportunities (
+      condition_id, question, slug, strategy_type,
+      price_sum, spread, expected_profit, actual_profit,
+      investment_amount, max_tradeable, tokens, status,
+      execution_steps, trade_id, order_ids, tx_hashes,
+      error_message, retry_count, queued_at, started_at, completed_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `
+  const [result] = await p.execute(sql, [
+    opp.conditionId,
+    opp.question,
+    opp.slug || null,
+    opp.strategyType,
+    opp.priceSum || null,
+    opp.spread || null,
+    opp.expectedProfit || null,
+    opp.actualProfit || null,
+    opp.investmentAmount || null,
+    opp.maxTradeable || null,
+    opp.tokens ? JSON.stringify(opp.tokens) : null,
+    opp.status || 'PENDING',
+    opp.executionSteps ? JSON.stringify(opp.executionSteps) : null,
+    opp.tradeId || null,
+    opp.orderIds ? JSON.stringify(opp.orderIds) : null,
+    opp.txHashes ? JSON.stringify(opp.txHashes) : null,
+    opp.errorMessage || null,
+    opp.retryCount || 0,
+    opp.queuedAt || null,
+    opp.startedAt || null,
+    opp.completedAt || null,
+  ])
+  return (result as any).insertId
+}
+
+/**
+ * 更新机会状态
+ */
+export async function updateOpportunityStatus(
+  id: number,
+  updates: {
+    status?: OpportunityStatus
+    actualProfit?: number
+    tradeId?: number
+    txHashes?: string[]
+    orderIds?: string[]
+    executionSteps?: ExecutionStep[]
+    errorMessage?: string
+    retryCount?: number
+    queuedAt?: Date
+    startedAt?: Date
+    completedAt?: Date
+  }
+): Promise<void> {
+  const p = getPool()
+  const setClauses: string[] = []
+  const params: any[] = []
+
+  if (updates.status !== undefined) {
+    setClauses.push('status = ?')
+    params.push(updates.status)
+  }
+  if (updates.actualProfit !== undefined) {
+    setClauses.push('actual_profit = ?')
+    params.push(updates.actualProfit)
+  }
+  if (updates.tradeId !== undefined) {
+    setClauses.push('trade_id = ?')
+    params.push(updates.tradeId)
+  }
+  if (updates.txHashes !== undefined) {
+    setClauses.push('tx_hashes = ?')
+    params.push(JSON.stringify(updates.txHashes))
+  }
+  if (updates.orderIds !== undefined) {
+    setClauses.push('order_ids = ?')
+    params.push(JSON.stringify(updates.orderIds))
+  }
+  if (updates.executionSteps !== undefined) {
+    setClauses.push('execution_steps = ?')
+    params.push(JSON.stringify(updates.executionSteps))
+  }
+  if (updates.errorMessage !== undefined) {
+    setClauses.push('error_message = ?')
+    params.push(updates.errorMessage)
+  }
+  if (updates.retryCount !== undefined) {
+    setClauses.push('retry_count = ?')
+    params.push(updates.retryCount)
+  }
+  if (updates.queuedAt !== undefined) {
+    setClauses.push('queued_at = ?')
+    params.push(updates.queuedAt)
+  }
+  if (updates.startedAt !== undefined) {
+    setClauses.push('started_at = ?')
+    params.push(updates.startedAt)
+  }
+  if (updates.completedAt !== undefined) {
+    setClauses.push('completed_at = ?')
+    params.push(updates.completedAt)
+  }
+
+  if (setClauses.length === 0) return
+
+  params.push(id)
+  const sql = `UPDATE opportunities SET ${setClauses.join(', ')} WHERE id = ?`
+  await p.execute(sql, params)
+}
+
+/**
+ * 追加执行步骤
+ */
+export async function appendExecutionStep(id: number, step: ExecutionStep): Promise<void> {
+  const p = getPool()
+  const sql = `
+    UPDATE opportunities 
+    SET execution_steps = JSON_ARRAY_APPEND(
+      COALESCE(execution_steps, JSON_ARRAY()), 
+      '$', 
+      CAST(? AS JSON)
+    )
+    WHERE id = ?
+  `
+  await p.execute(sql, [JSON.stringify(step), id])
+}
+
+/**
+ * 获取机会列表
+ */
+export async function getOpportunities(options: {
+  strategyType?: OpportunityStrategyType
+  status?: OpportunityStatus
+  conditionId?: string
+  startTime?: Date
+  endTime?: Date
+  limit?: number
+  offset?: number
+} = {}): Promise<OpportunityFullRecord[]> {
+  const p = getPool()
+  const { strategyType, status, conditionId, startTime, endTime, limit = 50, offset = 0 } = options
+
+  let whereClause = '1=1'
+  const params: any[] = []
+
+  if (strategyType) {
+    whereClause += ' AND strategy_type = ?'
+    params.push(strategyType)
+  }
+  if (status) {
+    whereClause += ' AND status = ?'
+    params.push(status)
+  }
+  if (conditionId) {
+    whereClause += ' AND condition_id = ?'
+    params.push(conditionId)
+  }
+  if (startTime) {
+    whereClause += ' AND created_at >= ?'
+    params.push(startTime)
+  }
+  if (endTime) {
+    whereClause += ' AND created_at <= ?'
+    params.push(endTime)
+  }
+
+  const sql = `
+    SELECT 
+      id, condition_id as conditionId, question, slug,
+      strategy_type as strategyType,
+      price_sum as priceSum, spread, expected_profit as expectedProfit,
+      actual_profit as actualProfit, investment_amount as investmentAmount,
+      max_tradeable as maxTradeable, tokens, status,
+      execution_steps as executionSteps, trade_id as tradeId,
+      order_ids as orderIds, tx_hashes as txHashes,
+      error_message as errorMessage, retry_count as retryCount,
+      created_at as createdAt, queued_at as queuedAt,
+      started_at as startedAt, completed_at as completedAt
+    FROM opportunities
+    WHERE ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT ${Number(limit)} OFFSET ${Number(offset)}
+  `
+
+  const [rows] = await p.query(sql, params)
+  return (rows as any[]).map(row => ({
+    ...row,
+    tokens: row.tokens ? JSON.parse(row.tokens) : null,
+    executionSteps: row.executionSteps ? JSON.parse(row.executionSteps) : null,
+    orderIds: row.orderIds ? JSON.parse(row.orderIds) : null,
+    txHashes: row.txHashes ? JSON.parse(row.txHashes) : null,
+  }))
+}
+
+/**
+ * 获取单个机会详情
+ */
+export async function getOpportunityById(id: number): Promise<OpportunityFullRecord | null> {
+  const p = getPool()
+  const sql = `
+    SELECT 
+      id, condition_id as conditionId, question, slug,
+      strategy_type as strategyType,
+      price_sum as priceSum, spread, expected_profit as expectedProfit,
+      actual_profit as actualProfit, investment_amount as investmentAmount,
+      max_tradeable as maxTradeable, tokens, status,
+      execution_steps as executionSteps, trade_id as tradeId,
+      order_ids as orderIds, tx_hashes as txHashes,
+      error_message as errorMessage, retry_count as retryCount,
+      created_at as createdAt, queued_at as queuedAt,
+      started_at as startedAt, completed_at as completedAt
+    FROM opportunities
+    WHERE id = ?
+  `
+  const [rows] = await p.execute(sql, [id])
+  const row = (rows as any[])[0]
+  if (!row) return null
+
+  return {
+    ...row,
+    tokens: row.tokens ? JSON.parse(row.tokens) : null,
+    executionSteps: row.executionSteps ? JSON.parse(row.executionSteps) : null,
+    orderIds: row.orderIds ? JSON.parse(row.orderIds) : null,
+    txHashes: row.txHashes ? JSON.parse(row.txHashes) : null,
+  }
+}
+
+/**
+ * 获取机会统计
+ */
+export async function getOpportunityStats(options: {
+  strategyType?: OpportunityStrategyType
+  startTime?: Date
+  endTime?: Date
+} = {}): Promise<{
+  total: number
+  pending: number
+  queued: number
+  executing: number
+  success: number
+  failed: number
+  partial: number
+  expired: number
+  cancelled: number
+  totalExpectedProfit: number
+  totalActualProfit: number
+  successRate: number
+}> {
+  const p = getPool()
+  const { strategyType, startTime, endTime } = options
+
+  let whereClause = '1=1'
+  const params: any[] = []
+
+  if (strategyType) {
+    whereClause += ' AND strategy_type = ?'
+    params.push(strategyType)
+  }
+  if (startTime) {
+    whereClause += ' AND created_at >= ?'
+    params.push(startTime)
+  }
+  if (endTime) {
+    whereClause += ' AND created_at <= ?'
+    params.push(endTime)
+  }
+
+  const sql = `
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending,
+      SUM(CASE WHEN status = 'QUEUED' THEN 1 ELSE 0 END) as queued,
+      SUM(CASE WHEN status = 'EXECUTING' THEN 1 ELSE 0 END) as executing,
+      SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success,
+      SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
+      SUM(CASE WHEN status = 'PARTIAL' THEN 1 ELSE 0 END) as partial,
+      SUM(CASE WHEN status = 'EXPIRED' THEN 1 ELSE 0 END) as expired,
+      SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) as cancelled,
+      COALESCE(SUM(expected_profit), 0) as totalExpectedProfit,
+      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PARTIAL') THEN actual_profit ELSE 0 END), 0) as totalActualProfit
+    FROM opportunities
+    WHERE ${whereClause}
+  `
+  const [rows] = await p.execute(sql, params)
+  const row = (rows as any[])[0]
+
+  const total = row.total || 0
+  const success = row.success || 0
+  const partial = row.partial || 0
+
+  return {
+    total,
+    pending: row.pending || 0,
+    queued: row.queued || 0,
+    executing: row.executing || 0,
+    success,
+    failed: row.failed || 0,
+    partial,
+    expired: row.expired || 0,
+    cancelled: row.cancelled || 0,
+    totalExpectedProfit: parseFloat(row.totalExpectedProfit) || 0,
+    totalActualProfit: parseFloat(row.totalActualProfit) || 0,
+    successRate: total > 0 ? ((success + partial) / total) * 100 : 0,
+  }
+}
+
+/**
+ * 获取今日统计
+ */
+export async function getTodayOpportunityStats(strategyType?: OpportunityStrategyType): Promise<{
+  found: number
+  executed: number
+  success: number
+  failed: number
+  profit: number
+}> {
+  const p = getPool()
+  
+  let whereClause = 'DATE(created_at) = CURDATE()'
+  const params: any[] = []
+  
+  if (strategyType) {
+    whereClause += ' AND strategy_type = ?'
+    params.push(strategyType)
+  }
+
+  const sql = `
+    SELECT 
+      COUNT(*) as found,
+      SUM(CASE WHEN status IN ('SUCCESS', 'FAILED', 'PARTIAL') THEN 1 ELSE 0 END) as executed,
+      SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success,
+      SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
+      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PARTIAL') THEN actual_profit ELSE 0 END), 0) as profit
+    FROM opportunities
+    WHERE ${whereClause}
+  `
+  const [rows] = await p.execute(sql, params)
+  const row = (rows as any[])[0]
+
+  return {
+    found: row.found || 0,
+    executed: row.executed || 0,
+    success: row.success || 0,
+    failed: row.failed || 0,
+    profit: parseFloat(row.profit) || 0,
+  }
+}
+
+/**
+ * 清理过期的待处理机会 (超过指定时间未执行)
+ */
+export async function expireStaleOpportunities(maxAgeMinutes: number = 5): Promise<number> {
+  const p = getPool()
+  const [result] = await p.execute(
+    `UPDATE opportunities 
+     SET status = 'EXPIRED' 
+     WHERE status IN ('PENDING', 'QUEUED') 
+     AND created_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+    [maxAgeMinutes]
+  )
+  return (result as any).affectedRows
+}
+
+// ==================== 策略配置持久化 ====================
+
+/**
+ * 保存策略配置到数据库
+ */
+export async function saveStrategyConfig(
+  strategyType: string,
+  enabled: boolean,
+  config: Record<string, any>
+): Promise<void> {
+  const p = getPool()
+  const sql = `
+    INSERT INTO strategy_configs (strategy_type, enabled, config)
+    VALUES (?, ?, ?)
+    ON DUPLICATE KEY UPDATE 
+      enabled = VALUES(enabled),
+      config = VALUES(config),
+      updated_at = CURRENT_TIMESTAMP
+  `
+  await p.execute(sql, [strategyType, enabled, JSON.stringify(config)])
+}
+
+/**
+ * 获取策略配置
+ */
+export async function getStrategyConfig(strategyType: string): Promise<{
+  enabled: boolean
+  config: Record<string, any>
+} | null> {
+  const p = getPool()
+  const sql = `SELECT enabled, config FROM strategy_configs WHERE strategy_type = ?`
+  const [rows] = await p.execute(sql, [strategyType])
+  const row = (rows as any[])[0]
+  if (!row) return null
+  return {
+    enabled: !!row.enabled,
+    config: row.config ? JSON.parse(row.config) : {},
+  }
+}
+
+/**
+ * 获取所有策略配置
+ */
+export async function getAllStrategyConfigs(): Promise<Record<string, {
+  enabled: boolean
+  config: Record<string, any>
+}>> {
+  const p = getPool()
+  const sql = `SELECT strategy_type, enabled, config FROM strategy_configs`
+  const [rows] = await p.execute(sql)
+  
+  const result: Record<string, { enabled: boolean; config: Record<string, any> }> = {}
+  for (const row of rows as any[]) {
+    result[row.strategy_type] = {
+      enabled: !!row.enabled,
+      config: row.config ? JSON.parse(row.config) : {},
+    }
+  }
+  return result
+}
+
+// ==================== 队列状态持久化 ====================
+
+/**
+ * 更新队列状态
+ */
+export async function updateQueueStatus(
+  queueName: string,
+  status: {
+    currentSize?: number
+    maxSize?: number
+    state?: 'idle' | 'running' | 'paused' | 'stopped'
+    processedCount?: number
+    errorCount?: number
+    lastTaskAt?: Date
+    config?: Record<string, any>
+  }
+): Promise<void> {
+  const p = getPool()
+  const setClauses: string[] = []
+  const params: any[] = []
+
+  if (status.currentSize !== undefined) {
+    setClauses.push('current_size = ?')
+    params.push(status.currentSize)
+  }
+  if (status.maxSize !== undefined) {
+    setClauses.push('max_size = ?')
+    params.push(status.maxSize)
+  }
+  if (status.state !== undefined) {
+    setClauses.push('state = ?')
+    params.push(status.state)
+  }
+  if (status.processedCount !== undefined) {
+    setClauses.push('processed_count = ?')
+    params.push(status.processedCount)
+  }
+  if (status.errorCount !== undefined) {
+    setClauses.push('error_count = ?')
+    params.push(status.errorCount)
+  }
+  if (status.lastTaskAt !== undefined) {
+    setClauses.push('last_task_at = ?')
+    params.push(status.lastTaskAt)
+  }
+  if (status.config !== undefined) {
+    setClauses.push('config = ?')
+    params.push(JSON.stringify(status.config))
+  }
+
+  if (setClauses.length === 0) return
+
+  const sql = `
+    INSERT INTO queue_status (queue_name, ${setClauses.map(c => c.split(' = ')[0]).join(', ')})
+    VALUES (?, ${setClauses.map(() => '?').join(', ')})
+    ON DUPLICATE KEY UPDATE ${setClauses.join(', ')}
+  `
+  await p.execute(sql, [queueName, ...params, ...params])
+}
+
+/**
+ * 获取队列状态
+ */
+export async function getQueueStatus(queueName: string): Promise<{
+  currentSize: number
+  maxSize: number
+  state: 'idle' | 'running' | 'paused' | 'stopped'
+  processedCount: number
+  errorCount: number
+  lastTaskAt: Date | null
+  config: Record<string, any>
+} | null> {
+  const p = getPool()
+  const sql = `
+    SELECT current_size, max_size, state, processed_count, error_count, last_task_at, config
+    FROM queue_status
+    WHERE queue_name = ?
+  `
+  const [rows] = await p.execute(sql, [queueName])
+  const row = (rows as any[])[0]
+  if (!row) return null
+  return {
+    currentSize: row.current_size || 0,
+    maxSize: row.max_size || 0,
+    state: row.state || 'idle',
+    processedCount: row.processed_count || 0,
+    errorCount: row.error_count || 0,
+    lastTaskAt: row.last_task_at || null,
+    config: row.config ? JSON.parse(row.config) : {},
+  }
+}
+
+/**
+ * 获取所有队列状态
+ */
+export async function getAllQueueStatus(): Promise<Record<string, {
+  currentSize: number
+  maxSize: number
+  state: 'idle' | 'running' | 'paused' | 'stopped'
+  processedCount: number
+  errorCount: number
+  lastTaskAt: Date | null
+}>> {
+  const p = getPool()
+  const sql = `SELECT queue_name, current_size, max_size, state, processed_count, error_count, last_task_at FROM queue_status`
+  const [rows] = await p.execute(sql)
+  
+  const result: Record<string, any> = {}
+  for (const row of rows as any[]) {
+    result[row.queue_name] = {
+      currentSize: row.current_size || 0,
+      maxSize: row.max_size || 0,
+      state: row.state || 'idle',
+      processedCount: row.processed_count || 0,
+      errorCount: row.error_count || 0,
+      lastTaskAt: row.last_task_at || null,
+    }
+  }
+  return result
 }

@@ -161,6 +161,7 @@ export function initQueueSystem(): {
 
   // 设置扫描队列的数据回调 - 扫描结果自动流入存储队列
   scanQueue.setOnMarketsScanned(async (markets: MarketData[]) => {
+    console.log(`📤 [QueueSystem] 扫描完成，${markets.length} 条数据流入存储队列`)
     await storageQueue.add(markets)
   })
 

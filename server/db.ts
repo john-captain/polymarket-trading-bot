@@ -19,7 +19,7 @@ const dbConfig = {
     database: process.env.DB_NAME || 'polymarket',
     charset: 'utf8mb4',
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 20,
     queueLimit: 0
 };
 

@@ -582,18 +582,22 @@ export class MarketMakingQueue {
 
 // ==================== 单例导出 ====================
 
-let marketMakingQueueInstance: MarketMakingQueue | null = null
+// 使用 globalThis 防止开发模式热重载时丢失状态
+const globalForMarketMaking = globalThis as unknown as {
+  marketMakingQueueInstance: MarketMakingQueue | undefined
+}
 
 export function getMarketMakingQueue(): MarketMakingQueue {
-  if (!marketMakingQueueInstance) {
-    marketMakingQueueInstance = new MarketMakingQueue()
+  if (!globalForMarketMaking.marketMakingQueueInstance) {
+    globalForMarketMaking.marketMakingQueueInstance = new MarketMakingQueue()
+    console.log('✅ [MarketMakingQueue] 策略队列已初始化')
   }
-  return marketMakingQueueInstance
+  return globalForMarketMaking.marketMakingQueueInstance
 }
 
 export function resetMarketMakingQueue(): void {
-  if (marketMakingQueueInstance) {
-    marketMakingQueueInstance.clear()
+  if (globalForMarketMaking.marketMakingQueueInstance) {
+    globalForMarketMaking.marketMakingQueueInstance.clear()
   }
-  marketMakingQueueInstance = null
+  globalForMarketMaking.marketMakingQueueInstance = undefined
 }

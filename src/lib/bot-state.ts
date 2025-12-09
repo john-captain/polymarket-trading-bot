@@ -1,6 +1,12 @@
 // 全局状态管理 - 在服务端保持状态
 // 注意：在生产环境中建议使用 Redis 或数据库
 
+// 从统一配置导入市场分类
+import { MARKET_CATEGORY_OPTIONS } from './filter-config'
+
+// 向后兼容：导出 MARKET_CATEGORIES (旧名称)
+export const MARKET_CATEGORIES = MARKET_CATEGORY_OPTIONS
+
 interface BotState {
   isRunning: boolean
   startTime: Date | null
@@ -72,23 +78,8 @@ export const arbitrageSettings: ArbitrageSettings = {
   maxOutcomes: 0,  // 0 表示不限制
 }
 
-// 可用的市场分类
-export const MARKET_CATEGORIES = [
-  { value: "", label: "全部分类" },
-  { value: "Crypto", label: "加密货币" },
-  { value: "Sports", label: "体育" },
-  { value: "US-current-affairs", label: "美国时事" },
-  { value: "Global Politics", label: "全球政治" },
-  { value: "Business", label: "商业" },
-  { value: "Tech", label: "科技" },
-  { value: "Science", label: "科学" },
-  { value: "Pop-Culture", label: "流行文化" },
-  { value: "Space", label: "航天" },
-  { value: "Art", label: "艺术" },
-  { value: "Chess", label: "国际象棋" },
-  { value: "Olympics", label: "奥运会" },
-  { value: "NFTs", label: "NFT" },
-]
+// 可用的市场分类 - 已迁移到 filter-config.ts
+// 保留此处注释供参考，实际使用从 filter-config 导入
 
 // 系统日志
 export const systemLogs: string[] = []

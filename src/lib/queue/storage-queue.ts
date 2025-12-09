@@ -6,7 +6,7 @@
  */
 
 import PQueue from 'p-queue'
-import { batchUpsertMarkets } from '@/lib/database'
+import { batchUpsertMarkets, batchRecordPriceSnapshots } from '@/lib/database'
 import type { MarketRecord } from '@/lib/database'
 import type {
   QueueConfig,
@@ -25,6 +25,7 @@ export interface StorageTaskResult {
   updated: number
   failed: number
   duration: number
+  priceSnapshots?: number  // 价格快照记录数
   errors?: string[]
 }
 
@@ -174,9 +175,14 @@ export class StorageQueue {
       this.state = 'running'
       this.emitEvent('task:start', { batchId, count: records.length })
 
-      // 执行批量写入
+      // 执行批量写入（市场主表 - UPSERT）
       const result = await this.queue.add(async () => {
         return await batchUpsertMarkets(records)
+      })
+
+      // 同时记录价格历史（追加写入，用于回测）
+      const priceCount = await this.queue.add(async () => {
+        return await batchRecordPriceSnapshots(records)
       })
 
       const duration = Date.now() - startTime
@@ -186,6 +192,7 @@ export class StorageQueue {
         updated: result?.updated ?? 0,
         failed: 0,
         duration,
+        priceSnapshots: priceCount ?? 0,
       }
 
       this.totalBatches++
@@ -194,7 +201,7 @@ export class StorageQueue {
 
       console.log(
         `✅ [StorageQueue] 批次 ${batchId} 完成: ` +
-        `新增 ${taskResult.inserted}, 更新 ${taskResult.updated}, 耗时 ${duration}ms`
+        `新增 ${taskResult.inserted}, 更新 ${taskResult.updated}, 价格快照 ${priceCount}, 耗时 ${duration}ms`
       )
 
       this.emitEvent('task:complete', taskResult)
@@ -415,24 +422,28 @@ export class StorageQueue {
 
 // ==================== 单例导出 ====================
 
-let storageQueueInstance: StorageQueue | null = null
+// 使用 globalThis 防止开发模式热重载时丢失状态
+const globalForStorageQueue = globalThis as unknown as {
+  storageQueueInstance: StorageQueue | undefined
+}
 
 /**
  * 获取存储队列单例
  */
 export function getStorageQueue(): StorageQueue {
-  if (!storageQueueInstance) {
-    storageQueueInstance = new StorageQueue()
+  if (!globalForStorageQueue.storageQueueInstance) {
+    globalForStorageQueue.storageQueueInstance = new StorageQueue()
+    console.log('✅ [StorageQueue] 存储队列已初始化')
   }
-  return storageQueueInstance
+  return globalForStorageQueue.storageQueueInstance
 }
 
 /**
  * 重置存储队列单例 (用于测试)
  */
 export function resetStorageQueue(): void {
-  if (storageQueueInstance) {
-    storageQueueInstance.stop()
-    storageQueueInstance = null
+  if (globalForStorageQueue.storageQueueInstance) {
+    globalForStorageQueue.storageQueueInstance.stop()
+    globalForStorageQueue.storageQueueInstance = undefined
   }
 }

@@ -211,7 +211,7 @@ interface MintSplitQueueConfig {
   minProfit: 0.01             // 最小利润 $0.01
   maxMintAmount: 100          // 单次最大铸造金额
   defaultMintAmount: 10       // 默认铸造金额
-  minOutcomes: 3              // 最少结果数
+  minOutcomes: 2              // 最少结果数
   maxSlippage: 0.02           // 最大滑点 2%
   
   // 安全配置

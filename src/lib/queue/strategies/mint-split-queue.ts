@@ -14,6 +14,8 @@ import PQueue from 'p-queue'
 import type { MarketData, QueueEventType } from '../types'
 import type { DispatchTask } from '../strategy-dispatcher'
 import { getStrategyConfigManager, type MintSplitConfig } from '../strategy-config'
+import { PolymarketContracts } from '../../polymarket-contracts'
+import { getClobClient } from '../../api-client/clob'
 
 // ==================== 类型定义 ====================
 
@@ -316,22 +318,116 @@ export class MintSplitQueue {
 
   /**
    * 执行计划 (实际交易)
+   * 
+   * 步骤：
+   * 1. 调用合约铸造代币
+   * 2. 批量下卖单
+   * 3. 等待成交确认
+   * 4. 计算实际利润
    */
   async executePlan(plan: MintSplitExecutionPlan): Promise<MintSplitResult> {
     const startTime = Date.now()
     const { opportunity } = plan
+    const txHashes: string[] = []
 
     try {
       opportunity.status = 'executing'
       console.log(`⚡ [MintSplitQueue] 开始执行: ${opportunity.id}`)
+      console.log(`   市场: ${opportunity.question}`)
+      console.log(`   铸造金额: $${plan.mintAmount}`)
+      console.log(`   预期利润: $${plan.expectedProfit.toFixed(4)}`)
 
-      // TODO: 实际执行交易逻辑
-      // 1. 调用合约铸造代币
-      // 2. 批量下卖单
-      // 3. 等待成交确认
+      // 检查私钥配置
+      if (!process.env.PRIVATE_KEY) {
+        throw new Error('未配置 PRIVATE_KEY 环境变量')
+      }
 
-      // 模拟执行 (实际实现需要调用 polymarket-contracts)
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // ==================== Step 1: 铸造代币 ====================
+      console.log(`\n🔨 [MintSplitQueue] Step 1: 铸造代币...`)
+      
+      const contracts = new PolymarketContracts(process.env.PRIVATE_KEY)
+      const mintResult = await contracts.mintTokens(
+        opportunity.conditionId,
+        plan.mintAmount,
+        opportunity.outcomes.length
+      )
+
+      if (!mintResult.success) {
+        throw new Error(`铸造失败: ${mintResult.error}`)
+      }
+
+      if (mintResult.txHash) {
+        txHashes.push(mintResult.txHash)
+      }
+      console.log(`   ✅ 铸造成功: ${mintResult.txHash}`)
+
+      // ==================== Step 2: 批量下卖单 ====================
+      console.log(`\n📤 [MintSplitQueue] Step 2: 批量下卖单...`)
+      
+      const clob = getClobClient()
+      const context = { 
+        traceId: opportunity.id, 
+        source: 'mint-split-execution' 
+      }
+
+      let totalRevenue = 0
+      const sellResults: { tokenId: string; outcome: string; success: boolean; orderId?: string; error?: string }[] = []
+
+      for (const sellOrder of plan.sellOrders) {
+        console.log(`   📝 下单: ${sellOrder.outcome} @ $${sellOrder.price.toFixed(4)} x ${sellOrder.size}`)
+        
+        const orderResult = await clob.createOrder(
+          {
+            tokenId: sellOrder.tokenId,
+            side: 'SELL',
+            price: sellOrder.price,
+            size: sellOrder.size,
+          },
+          { tickSize: '0.01', negRisk: false },
+          context
+        )
+
+        if (orderResult.success && orderResult.data) {
+          sellResults.push({
+            tokenId: sellOrder.tokenId,
+            outcome: sellOrder.outcome,
+            success: true,
+            orderId: orderResult.data.orderId,
+          })
+          totalRevenue += sellOrder.price * sellOrder.size
+          console.log(`      ✅ 订单已提交: ${orderResult.data.orderId}`)
+          
+          if (orderResult.data.transactionsHashes) {
+            txHashes.push(...orderResult.data.transactionsHashes)
+          }
+        } else {
+          sellResults.push({
+            tokenId: sellOrder.tokenId,
+            outcome: sellOrder.outcome,
+            success: false,
+            error: orderResult.error,
+          })
+          console.log(`      ❌ 下单失败: ${orderResult.error}`)
+        }
+
+        // 每个订单之间稍微延迟，避免限速
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+
+      // 检查卖单结果
+      const successSells = sellResults.filter(r => r.success).length
+      const failedSells = sellResults.filter(r => !r.success).length
+
+      if (failedSells > 0) {
+        console.log(`   ⚠️ 部分订单失败: ${successSells}/${sellResults.length} 成功`)
+      }
+
+      // ==================== Step 3: 计算结果 ====================
+      console.log(`\n📊 [MintSplitQueue] Step 3: 计算结果...`)
+
+      // 实际利润 = 卖出总收入 - 铸造成本 - 手续费
+      const takerFee = totalRevenue * (FEES.TAKER_FEE_PERCENT / 100)
+      const actualProfit = totalRevenue - plan.mintAmount - takerFee - FEES.MIN_TX_COST
 
       // 记录交易量
       getStrategyConfigManager().recordTradeVolume('MINT_SPLIT', plan.mintAmount)
@@ -339,39 +435,52 @@ export class MintSplitQueue {
       // 设置冷却
       this.setCooldown(opportunity.conditionId)
 
-      opportunity.status = 'executed'
+      // 更新状态和统计
+      opportunity.status = failedSells === 0 ? 'executed' : 'failed'
       this.stats.totalExecuted++
-      this.stats.totalSuccess++
-      this.stats.totalProfit += plan.expectedProfit
+      
+      if (failedSells === 0) {
+        this.stats.totalSuccess++
+        this.stats.totalProfit += actualProfit
+      } else {
+        this.stats.totalFailed++
+      }
 
       const result: MintSplitResult = {
-        success: true,
+        success: failedSells === 0,
         opportunityId: opportunity.id,
         actualMintAmount: plan.mintAmount,
-        actualRevenue: plan.expectedRevenue,
-        actualProfit: plan.expectedProfit,
-        txHashes: [], // TODO: 填入实际交易哈希
+        actualRevenue: totalRevenue,
+        actualProfit: actualProfit,
+        txHashes,
         duration: Date.now() - startTime,
       }
 
-      console.log(
-        `✅ [MintSplitQueue] 执行成功: ${opportunity.id}, ` +
-        `铸造=$${plan.mintAmount}, 利润=$${plan.expectedProfit.toFixed(4)}`
-      )
+      console.log(`\n${'='.repeat(50)}`)
+      console.log(`${result.success ? '✅' : '⚠️'} [MintSplitQueue] 执行${result.success ? '成功' : '部分成功'}`)
+      console.log(`   机会ID: ${opportunity.id}`)
+      console.log(`   铸造金额: $${plan.mintAmount}`)
+      console.log(`   卖出收入: $${totalRevenue.toFixed(4)}`)
+      console.log(`   手续费: $${takerFee.toFixed(4)}`)
+      console.log(`   实际利润: $${actualProfit.toFixed(4)}`)
+      console.log(`   耗时: ${result.duration}ms`)
+      console.log(`${'='.repeat(50)}\n`)
 
       this.emitEvent('task:complete', result)
       return result
+
     } catch (error) {
       opportunity.status = 'failed'
       this.stats.totalFailed++
 
       const errorMsg = error instanceof Error ? error.message : String(error)
-      console.error(`❌ [MintSplitQueue] 执行失败:`, error)
+      console.error(`\n❌ [MintSplitQueue] 执行失败: ${errorMsg}`)
 
       const result: MintSplitResult = {
         success: false,
         opportunityId: opportunity.id,
         error: errorMsg,
+        txHashes,
         duration: Date.now() - startTime,
       }
 
@@ -481,18 +590,22 @@ export class MintSplitQueue {
 
 // ==================== 单例导出 ====================
 
-let mintSplitQueueInstance: MintSplitQueue | null = null
+// 使用 globalThis 防止开发模式热重载时丢失状态
+const globalForMintSplit = globalThis as unknown as {
+  mintSplitQueueInstance: MintSplitQueue | undefined
+}
 
 export function getMintSplitQueue(): MintSplitQueue {
-  if (!mintSplitQueueInstance) {
-    mintSplitQueueInstance = new MintSplitQueue()
+  if (!globalForMintSplit.mintSplitQueueInstance) {
+    globalForMintSplit.mintSplitQueueInstance = new MintSplitQueue()
+    console.log('✅ [MintSplitQueue] 策略队列已初始化')
   }
-  return mintSplitQueueInstance
+  return globalForMintSplit.mintSplitQueueInstance
 }
 
 export function resetMintSplitQueue(): void {
-  if (mintSplitQueueInstance) {
-    mintSplitQueueInstance.clear()
+  if (globalForMintSplit.mintSplitQueueInstance) {
+    globalForMintSplit.mintSplitQueueInstance.clear()
   }
-  mintSplitQueueInstance = null
+  globalForMintSplit.mintSplitQueueInstance = undefined
 }

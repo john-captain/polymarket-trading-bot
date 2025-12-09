@@ -22,6 +22,8 @@ import {
   Layers,
   TestTube,
   Database,
+  Eye,
+  Cog,
 } from "lucide-react"
 
 interface NavItem {
@@ -39,20 +41,26 @@ const navigation: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
+    title: "机会监控",
+    href: "/opportunities",
+    icon: Eye,
+    badge: "新",
+  },
+  {
     title: "市场",
     icon: Search,
     children: [
       { title: "套利扫描", href: "/markets/scan", icon: Search, badge: "实时" },
-      { title: "同步市场", href: "/markets/sync", icon: Database },
+      { title: "市场列表", href: "/markets/sync", icon: Database },
     ],
   },
   {
     title: "策略",
     icon: Zap,
     children: [
-      { title: "铸造拆分", href: "/strategies/mint-split", icon: Layers },
-      { title: "套利策略", href: "/strategies/arbitrage", icon: TrendingUp },
-      { title: "做市策略", href: "/strategies/market-making", icon: BarChart3 },
+      { title: "铸造拆分", href: "/strategies/mint-split/config", icon: Layers, badge: "配置" },
+      { title: "套利策略", href: "/strategies/arbitrage/config", icon: TrendingUp, badge: "配置" },
+      { title: "做市策略", href: "/strategies/market-making/config", icon: BarChart3, badge: "配置" },
     ],
   },
   {

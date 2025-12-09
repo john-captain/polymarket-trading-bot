@@ -485,18 +485,22 @@ export class ArbitrageQueue {
 
 // ==================== 单例导出 ====================
 
-let arbitrageQueueInstance: ArbitrageQueue | null = null
+// 使用 globalThis 防止开发模式热重载时丢失状态
+const globalForArbitrage = globalThis as unknown as {
+  arbitrageQueueInstance: ArbitrageQueue | undefined
+}
 
 export function getArbitrageQueue(): ArbitrageQueue {
-  if (!arbitrageQueueInstance) {
-    arbitrageQueueInstance = new ArbitrageQueue()
+  if (!globalForArbitrage.arbitrageQueueInstance) {
+    globalForArbitrage.arbitrageQueueInstance = new ArbitrageQueue()
+    console.log('✅ [ArbitrageQueue] 策略队列已初始化')
   }
-  return arbitrageQueueInstance
+  return globalForArbitrage.arbitrageQueueInstance
 }
 
 export function resetArbitrageQueue(): void {
-  if (arbitrageQueueInstance) {
-    arbitrageQueueInstance.clear()
+  if (globalForArbitrage.arbitrageQueueInstance) {
+    globalForArbitrage.arbitrageQueueInstance.clear()
   }
-  arbitrageQueueInstance = null
+  globalForArbitrage.arbitrageQueueInstance = undefined
 }

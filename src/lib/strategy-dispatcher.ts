@@ -29,7 +29,7 @@ export interface StrategyConfig {
     minPriceSum: number      // Bid 总价阈值 (默认 1.005)
     minProfit: number        // 最小利润 ($)
     mintAmount: number       // 每次铸造金额
-    minOutcomes: number      // 最少 outcome 数量 (默认 3)
+    minOutcomes: number      // 最少 outcome 数量 (默认 2)
     maxSlippage: number      // 最大滑点 (%)
   }
   // 双边套利参数
@@ -108,7 +108,7 @@ let strategyConfig: StrategyConfig = {
     minPriceSum: 1.005,
     minProfit: 0.02,
     mintAmount: 10,
-    minOutcomes: 3,
+    minOutcomes: 2,
     maxSlippage: 0.5,
   },
   arbitrage: {

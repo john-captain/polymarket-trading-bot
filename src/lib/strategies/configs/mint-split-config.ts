@@ -26,7 +26,7 @@ export const DEFAULT_MINT_SPLIT_CONFIG: MintSplitConfig = {
   minProfit: 0.02,
   autoTrade: false,
   mintAmount: 10,
-  minOutcomes: 3,
+  minOutcomes: 2,
   maxSlippage: 1.0,
   scanInterval: 5000,
 }

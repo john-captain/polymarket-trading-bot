@@ -5,30 +5,25 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getMarkets, initMarketsTable } from "@/lib/database"
+import { parseUrlParams, buildDbParams, getSortConfig } from "@/lib/filter-config"
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100)
-    const offset = parseInt(searchParams.get("offset") || "0")
-    const active = searchParams.get("active")
-    const category = searchParams.get("category") || undefined
-    const search = searchParams.get("search") || undefined
-    const orderBy = searchParams.get("orderBy") || "updated_at"
-    const orderDir = (searchParams.get("orderDir") || "DESC").toUpperCase() as 'ASC' | 'DESC'
+    // 使用统一配置解析参数
+    const filters = parseUrlParams(searchParams)
+    const dbParams = buildDbParams(filters)
+    
+    // 限制最大数量
+    const limit = Math.min(filters.limit || 50, 100)
     
     // 确保表存在
     await initMarketsTable()
     
     const result = await getMarkets({
+      ...dbParams,
       limit,
-      offset,
-      active: active === "true" ? true : active === "false" ? false : undefined,
-      category,
-      search,
-      orderBy,
-      orderDir,
     })
     
     return NextResponse.json({
@@ -37,8 +32,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         total: result.total,
         limit,
-        offset,
-        hasMore: offset + result.markets.length < result.total,
+        offset: filters.offset || 0,
+        hasMore: (filters.offset || 0) + result.markets.length < result.total,
       },
     })
     

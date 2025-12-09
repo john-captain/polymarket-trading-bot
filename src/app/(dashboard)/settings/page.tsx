@@ -8,6 +8,21 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Settings as SettingsIcon,
   User,
   Shield,
@@ -22,10 +37,21 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
+  FileText,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Activity,
 } from "lucide-react"
 import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 export default function SettingsPage() {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
   const [showPrivateKey, setShowPrivateKey] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState({
@@ -64,7 +90,7 @@ export default function SettingsPage() {
 
       <div className="flex-1 space-y-6 p-6">
         <Tabs defaultValue="account" className="space-y-6">
-          <TabsList className="grid w-full max-w-[600px] grid-cols-4">
+          <TabsList className="grid w-full max-w-[750px] grid-cols-5">
             <TabsTrigger value="account" className="gap-2">
               <User className="h-4 w-4" />
               账户
@@ -80,6 +106,10 @@ export default function SettingsPage() {
             <TabsTrigger value="security" className="gap-2">
               <Shield className="h-4 w-4" />
               安全
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="gap-2">
+              <FileText className="h-4 w-4" />
+              日志
             </TabsTrigger>
           </TabsList>
 
@@ -417,6 +447,11 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* API 日志 */}
+          <TabsContent value="logs">
+            <ApiLogsTab />
+          </TabsContent>
         </Tabs>
 
         {/* 保存按钮 */}
@@ -427,6 +462,354 @@ export default function SettingsPage() {
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// API 日志类型定义
+interface ApiLog {
+  id: number
+  clientType: string
+  endpoint: string
+  method: string
+  requestParams?: Record<string, any>
+  statusCode?: number
+  durationMs?: number
+  success: boolean
+  errorMessage?: string
+  traceId?: string
+  source?: string
+  createdAt: string
+}
+
+interface ApiLogStats {
+  total: number
+  success: number
+  failed: number
+  avgDuration: number
+  byClient: { clientType: string; count: number; avgDuration: number }[]
+}
+
+// API 日志 Tab 组件
+function ApiLogsTab() {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  
+  // 筛选状态
+  const [clientFilter, setClientFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [page, setPage] = useState(0)
+  const pageSize = 20
+  
+  // 获取统计数据
+  const { data: statsData } = useQuery({
+    queryKey: ['api-logs', 'stats'],
+    queryFn: async () => {
+      const res = await fetch('/api/logs?stats=true')
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      return data.data as ApiLogStats
+    },
+    refetchInterval: 30000,
+  })
+  
+  // 获取日志列表
+  const { data: logsData, isLoading } = useQuery({
+    queryKey: ['api-logs', clientFilter, statusFilter, page],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (clientFilter !== 'all') params.set('clientType', clientFilter)
+      if (statusFilter === 'success') params.set('success', 'true')
+      if (statusFilter === 'failed') params.set('success', 'false')
+      params.set('limit', String(pageSize))
+      params.set('offset', String(page * pageSize))
+      
+      const res = await fetch(`/api/logs?${params}`)
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      return data.data as { logs: ApiLog[]; pagination: { hasMore: boolean } }
+    },
+    refetchInterval: 10000,
+  })
+  
+  // 清理旧日志
+  const cleanMutation = useMutation({
+    mutationFn: async (days: number) => {
+      const res = await fetch(`/api/logs?days=${days}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      return data.data
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "清理成功",
+        description: data.message,
+      })
+      queryClient.invalidateQueries({ queryKey: ['api-logs'] })
+    },
+    onError: (error) => {
+      toast({
+        title: "清理失败",
+        description: error instanceof Error ? error.message : '未知错误',
+        variant: "destructive",
+      })
+    },
+  })
+  
+  const logs = logsData?.logs || []
+  const hasMore = logsData?.pagination?.hasMore || false
+  
+  // 格式化时间
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  }
+  
+  // 格式化端点显示
+  const formatEndpoint = (endpoint: string) => {
+    if (endpoint.length > 40) {
+      return endpoint.substring(0, 40) + '...'
+    }
+    return endpoint
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 统计卡片 */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">总请求数</p>
+                <p className="text-2xl font-bold">{statsData?.total || 0}</p>
+              </div>
+              <Activity className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">成功</p>
+                <p className="text-2xl font-bold text-green-600">{statsData?.success || 0}</p>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-green-500/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">失败</p>
+                <p className="text-2xl font-bold text-red-600">{statsData?.failed || 0}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-500/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">平均耗时</p>
+                <p className="text-2xl font-bold">{statsData?.avgDuration || 0}ms</p>
+              </div>
+              <Clock className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 日志表格 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                API 请求日志
+              </CardTitle>
+              <CardDescription>
+                查看所有 API 调用记录，用于调试和审计
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="客户端类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部类型</SelectItem>
+                  <SelectItem value="GAMMA">Gamma</SelectItem>
+                  <SelectItem value="CLOB">CLOB</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部状态</SelectItem>
+                  <SelectItem value="success">成功</SelectItem>
+                  <SelectItem value="failed">失败</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => cleanMutation.mutate(7)}
+                disabled={cleanMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                清理7天前
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[140px]">时间</TableHead>
+                  <TableHead className="w-[80px]">类型</TableHead>
+                  <TableHead className="w-[60px]">方法</TableHead>
+                  <TableHead>端点</TableHead>
+                  <TableHead className="w-[80px]">耗时</TableHead>
+                  <TableHead className="w-[80px]">状态</TableHead>
+                  <TableHead>错误信息</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      加载中...
+                    </TableCell>
+                  </TableRow>
+                ) : logs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      暂无日志记录
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  logs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {formatTime(log.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(
+                          log.clientType === 'GAMMA' && 'border-blue-300 bg-blue-50 text-blue-700',
+                          log.clientType === 'CLOB' && 'border-purple-300 bg-purple-50 text-purple-700',
+                        )}>
+                          {log.clientType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-mono text-xs">
+                          {log.method}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs max-w-[300px] truncate" title={log.endpoint}>
+                        {formatEndpoint(log.endpoint)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {log.durationMs ? `${log.durationMs}ms` : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {log.success ? (
+                          <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                            成功
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">
+                            失败
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={log.errorMessage || ''}>
+                        {log.errorMessage || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {/* 分页 */}
+          <div className="flex items-center justify-between mt-4">
+            <p className="text-sm text-muted-foreground">
+              第 {page + 1} 页，每页 {pageSize} 条
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={page === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(page + 1)}
+                disabled={!hasMore}
+              >
+                下一页
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 按客户端统计 */}
+      {statsData?.byClient && statsData.byClient.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>按客户端统计</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              {statsData.byClient.map((client) => (
+                <div 
+                  key={client.clientType}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className={cn(
+                      client.clientType === 'GAMMA' && 'border-blue-300 bg-blue-50 text-blue-700',
+                      client.clientType === 'CLOB' && 'border-purple-300 bg-purple-50 text-purple-700',
+                    )}>
+                      {client.clientType}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {client.count} 次请求
+                    </span>
+                  </div>
+                  <span className="text-sm font-mono">
+                    平均 {Math.round(client.avgDuration)}ms
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

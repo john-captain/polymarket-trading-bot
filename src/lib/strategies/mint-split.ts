@@ -41,7 +41,7 @@ export const defaultMintSplitSettings: ExtendedMintSplitSettings = {
   minLiquidity: 100,   // 最小 $100 流动性
   maxSlippage: 0.5,    // 最大 0.5% 滑点
   multiOutcomeOnly: true,  // 只扫描多选项市场
-  minOutcomes: 3,      // 至少 3 个结果
+  minOutcomes: 2,      // 至少 2 个结果（支持 Yes/No 二元市场）
   autoTrade: false,    // 默认不自动交易
 }
 

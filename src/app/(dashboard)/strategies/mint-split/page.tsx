@@ -75,7 +75,7 @@ export default function MintSplitStrategyPage() {
     minLiquidity: 100,
     maxSlippage: 0.5,
     multiOutcomeOnly: true,
-    minOutcomes: 3,
+    minOutcomes: 2,
   })
 
   // 同步服务端设置到表单
@@ -89,7 +89,7 @@ export default function MintSplitStrategyPage() {
         minLiquidity: currentSettings.minLiquidity || 100,
         maxSlippage: currentSettings.maxSlippage || 0.5,
         multiOutcomeOnly: currentSettings.multiOutcomeOnly ?? true,
-        minOutcomes: currentSettings.minOutcomes || 3,
+        minOutcomes: currentSettings.minOutcomes || 2,
       })
     }
   }, [currentSettings])
