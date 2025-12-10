@@ -180,14 +180,15 @@ export function initQueueSystem(): {
  */
 export async function startQueueSystem(): Promise<void> {
   const scanQueue = getScanQueue()
-  // 暂不启动存储队列
-  // const storageQueue = getStorageQueue()
-  // storageQueue.start()
+  const storageQueue = getStorageQueue()
+  
+  // 启动存储队列
+  storageQueue.start()
   
   // 启动扫描队列
   await scanQueue.start()
   
-  console.log('🚀 [QueueSystem] 队列系统已启动（仅策略队列）')
+  console.log('🚀 [QueueSystem] 队列系统已启动（含存储队列）')
 }
 
 /**
@@ -195,13 +196,13 @@ export async function startQueueSystem(): Promise<void> {
  */
 export async function stopQueueSystem(): Promise<void> {
   const scanQueue = getScanQueue()
+  const storageQueue = getStorageQueue()
   
   // 停止扫描
   await scanQueue.stop()
   
-  // 暂不处理存储队列
-  // const storageQueue = getStorageQueue()
-  // await storageQueue.stop()
+  // 停止存储队列
+  await storageQueue.stop()
   
   console.log('⏹️ [QueueSystem] 队列系统已停止')
 }
@@ -279,16 +280,16 @@ export function initStrategyQueueSystem() {
     await marketMakingQueue.handleTask(task)
   })
   
-  // 6. 连接扫描 → 策略分发（暂停存储队列，只运行策略）
+  // 6. 连接扫描 → 策略分发 + 存储队列
   scanQueue.setOnMarketsScanned(async (markets) => {
-    // 暂停存储到数据库，减少系统负担
-    // await storageQueue.add(markets)
+    // 存储到数据库
+    await storageQueue.add(markets)
     
     // 分发到策略队列
     await dispatcher.analyze(markets)
   })
   
-  console.log('✅ [QueueSystem] 策略队列系统已初始化（存储队列已暂停）')
+  console.log('✅ [QueueSystem] 策略队列系统已初始化（存储队列已启用）')
   
   return {
     scanQueue,

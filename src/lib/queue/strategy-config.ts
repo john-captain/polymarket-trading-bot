@@ -44,7 +44,7 @@ export interface MintSplitConfig {
 }
 
 /**
- * Arbitrage 策略配置 (仅 LONG)
+ * Arbitrage 策略配置 (LONG + SHORT)
  */
 export interface ArbitrageConfig {
   /** 是否启用 */
@@ -61,6 +61,17 @@ export interface ArbitrageConfig {
     minSpread: number
   }
   
+  // SHORT 子策略 (卖出总价 > 1)
+  short: {
+    enabled: boolean
+    /** 最小卖出价格和 (触发条件：价格和 > 此值) */
+    minPriceSum: number
+    /** 最小价差 (%) */
+    minSpread: number
+    /** 是否允许铸造后卖出 */
+    allowMint: boolean
+  }
+  
   // 交易参数
   /** 每次交易金额 ($) */
   tradeAmount: number
@@ -68,6 +79,8 @@ export interface ArbitrageConfig {
   maxSlippage: number
   /** 冷却时间 (ms) */
   cooldownMs: number
+  /** 最小流动性 ($) */
+  minLiquidity: number
   
   // 风控
   /** 单次最大交易量 ($) */
@@ -159,9 +172,16 @@ export const DEFAULT_ARBITRAGE_CONFIG: ArbitrageConfig = {
     maxPriceSum: 0.995,
     minSpread: 0.5,
   },
+  short: {
+    enabled: false, // 默认关闭，需要持仓或铸造
+    minPriceSum: 1.005,
+    minSpread: 0.5,
+    allowMint: false,
+  },
   tradeAmount: 10,
   maxSlippage: 0.5,
   cooldownMs: 60000,
+  minLiquidity: 100,
   maxTradePerOrder: 100,
   maxTradePerDay: 1000,
 }
