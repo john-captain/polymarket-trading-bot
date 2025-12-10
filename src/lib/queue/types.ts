@@ -191,14 +191,17 @@ export interface ScanConfig {
 
 /**
  * 默认扫描配置
+ * 
+ * Polymarket 活跃市场约 16k+，需要足够的页数来覆盖
+ * limit=200, maxPages=100 => 最多扫描 20,000 个市场
  */
 export const DEFAULT_SCAN_CONFIG: ScanConfig = {
   orderBy: 'volume',
-  limit: 100,
+  limit: 200,           // 每页 200 条（Gamma API 最大支持）
   closed: 'false',
-  maxPages: 10,
+  maxPages: 100,        // 最多 100 页，覆盖 20k 市场
   orderbookConcurrency: 20,
-  scanInterval: 5000,
+  scanInterval: 60000,  // 60秒扫描一轮（扫描16k市场需要时间）
 }
 
 // ==================== 任务类型 ====================

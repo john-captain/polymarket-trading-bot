@@ -184,7 +184,9 @@ export class ScanQueue {
     const traceId = generateTraceId()
     const context = { traceId, source: 'scan-queue' }
     
-    console.log(`🔍 [ScanQueue] 开始扫描，配置: limit=${config.limit}, maxPages=${config.maxPages}`)
+    const maxMarkets = config.limit * config.maxPages
+    console.log(`🔍 [ScanQueue] 开始扫描`)
+    console.log(`   配置: 每页=${config.limit}条, 最大页数=${config.maxPages}, 理论最大=${maxMarkets}个市场`)
     
     try {
       const gamma = getGammaClient()
@@ -192,7 +194,6 @@ export class ScanQueue {
       let page = 1
       let offset = 0
       let hasMore = true
-
       while (hasMore && page <= config.maxPages) {
         // 检查背压
         if (this.checkBackpressure?.()) {
@@ -209,10 +210,15 @@ export class ScanQueue {
         
         if (!response.success) {
           console.error(`❌ [ScanQueue] 获取第 ${page} 页失败:`, response.error)
-          if (allMarkets.length === 0) {
-            throw new Error(response.error || '获取市场数据失败')
+          // API 失败时，等待后重试一次
+          await this.sleep(2000)
+          const retryResponse = await gamma.getMarkets(params, context)
+          if (!retryResponse.success) {
+            console.error(`❌ [ScanQueue] 重试失败，停止扫描，已获取 ${allMarkets.length} 条`)
+            break
           }
-          break
+          // 重试成功，使用重试结果
+          Object.assign(response, retryResponse)
         }
 
         const rawMarkets = response.data || []
@@ -225,10 +231,17 @@ export class ScanQueue {
         
         allMarkets.push(...filteredMarkets)
         
-        console.log(`📊 [ScanQueue] 第 ${page} 页: 获取 ${rawMarkets.length} 条，过滤后 ${filteredMarkets.length} 条，累计 ${allMarkets.length} 条`)
+        // 每 10 页输出一次进度
+        if (page % 10 === 0 || rawMarkets.length < config.limit) {
+          console.log(`📊 [ScanQueue] 第 ${page}/${config.maxPages} 页: 获取 ${rawMarkets.length} 条，过滤后 ${filteredMarkets.length} 条，累计 ${allMarkets.length} 条`)
+        }
 
         // 检查是否还有更多
         if (rawMarkets.length < config.limit) {
+          console.log(`📋 [ScanQueue] 已到达数据末尾 (本页仅 ${rawMarkets.length}/${config.limit} 条)`)
+          hasMore = false
+        } else if (page >= config.maxPages) {
+          console.log(`📋 [ScanQueue] 已达到最大页数限制 (${config.maxPages} 页)`)
           hasMore = false
         } else {
           offset += config.limit
@@ -253,7 +266,7 @@ export class ScanQueue {
         duration,
       }
 
-      console.log(`✅ [ScanQueue] 扫描完成: ${allMarkets.length} 个市场, ${page} 页, 耗时 ${duration}ms`)
+      console.log(`✅ [ScanQueue] 扫描完成: ${allMarkets.length} 个市场, ${page} 页, 耗时 ${(duration / 1000).toFixed(1)}秒`)
       this.emitEvent('scan:complete', result)
 
       return result
