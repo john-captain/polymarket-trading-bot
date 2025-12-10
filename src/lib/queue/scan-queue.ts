@@ -112,6 +112,8 @@ export class ScanQueue {
       timeout: this.config.timeout,
     })
 
+    console.log(`ℹ️ [ScanQueue] 配置的超时时间: ${this.config.timeout} ms`)
+
     // 监听队列事件
     this.queue.on('active', () => {
       if (this.state !== 'stopped' && this.state !== 'paused') {

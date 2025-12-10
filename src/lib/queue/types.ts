@@ -31,7 +31,7 @@ export const DEFAULT_QUEUE_CONFIGS: Record<QueueName, QueueConfig> = {
     name: 'scan',
     concurrency: 1,
     maxSize: 1,
-    timeout: 120000,
+    timeout: 1200000, // 20 minutes
     autoStart: false,
   },
   storage: {
