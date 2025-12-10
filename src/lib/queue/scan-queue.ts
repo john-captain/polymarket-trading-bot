@@ -246,8 +246,9 @@ export class ScanQueue {
         } else {
           offset += config.limit
           page++
-          // 添加小延迟避免限速
-          await this.sleep(100)
+          // 添加 10 秒延迟避免限速和服务器压力
+          console.log(`⏳ [ScanQueue] 等待 10 秒后继续下一页...`)
+          await this.sleep(10000)
         }
       }
 
