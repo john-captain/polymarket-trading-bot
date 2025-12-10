@@ -20,7 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { RefreshCw, Search, Database, ChevronLeft, ChevronRight, TrendingUp, Activity, Lock, Unlock, ArrowUpRight, ArrowDownRight, Clock, Filter, Settings2, X, Copy, Check } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { RefreshCw, Search, Database, ChevronLeft, ChevronRight, TrendingUp, Activity, Lock, Unlock, ArrowUpRight, ArrowDownRight, Clock, Filter, Settings2, X, Copy, Check, History } from "lucide-react"
 import {
   MARKET_STATUS_OPTIONS,
   MARKET_SORT_OPTIONS,
@@ -73,11 +80,32 @@ interface Market {
   updatedAt: string
 }
 
+// 价格历史记录类型
+interface PriceHistoryRecord {
+  id: number
+  conditionId: string
+  outcomePrices: string
+  volume: number
+  volume24hr: number
+  liquidity: number
+  bestBid: number | null
+  bestAsk: number | null
+  spread: number | null
+  lastTradePrice: number | null
+  recordedAt: string
+}
+
 export default function MarketSyncPage() {
   const [stats, setStats] = useState<MarketStats | null>(null)
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  
+  // 价格历史弹窗状态
+  const [priceHistoryOpen, setPriceHistoryOpen] = useState(false)
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false)
+  const [priceHistoryData, setPriceHistoryData] = useState<PriceHistoryRecord[]>([])
+  const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   
   // 使用统一配置的筛选状态
   const [search, setSearch] = useState(DEFAULT_FILTER_CONFIG.search)
@@ -227,6 +255,40 @@ export default function MarketSyncPage() {
     } catch (err) {
       console.error('复制失败:', err)
     }
+  }
+
+  // 获取价格历史
+  const fetchPriceHistory = async (market: Market) => {
+    setSelectedMarket(market)
+    setPriceHistoryOpen(true)
+    setPriceHistoryLoading(true)
+    setPriceHistoryData([])
+    
+    try {
+      const res = await fetch(`/api/markets/${market.conditionId}/price-history?limit=100`)
+      const data = await res.json()
+      if (data.success && data.data?.history) {
+        setPriceHistoryData(data.data.history)
+      } else {
+        console.error('获取价格历史失败:', data.error)
+      }
+    } catch (err) {
+      console.error('获取价格历史失败:', err)
+    } finally {
+      setPriceHistoryLoading(false)
+    }
+  }
+
+  // 解析价格历史中的 outcomePrices
+  const parsePriceHistoryPrices = (outcomePrices: string | number[]): number[] => {
+    if (typeof outcomePrices === 'string') {
+      try {
+        return JSON.parse(outcomePrices)
+      } catch {
+        return []
+      }
+    }
+    return Array.isArray(outcomePrices) ? outcomePrices : []
   }
 
   return (
@@ -500,6 +562,11 @@ export default function MarketSyncPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
+                          <button 
+                            onClick={() => fetchPriceHistory(market)}
+                            className="hover:bg-muted/50 rounded-lg p-2 transition-colors cursor-pointer w-full"
+                            title="点击查看价格历史"
+                          >
                           {prices.length >= 2 ? (
                             <div className="flex flex-col gap-1">
                               <span className="font-mono text-sm">
@@ -517,6 +584,7 @@ export default function MarketSyncPage() {
                               {(prices[0] * 100).toFixed(2)}¢
                             </span>
                           ) : '-'}
+                          </button>
                         </TableCell>
                         <TableCell className="text-center">
                           {formatPriceChange(market.oneDayPriceChange)}
@@ -600,6 +668,100 @@ export default function MarketSyncPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 价格历史弹窗 */}
+      <Dialog open={priceHistoryOpen} onOpenChange={setPriceHistoryOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              价格历史
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              {selectedMarket?.question}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto">
+            {priceHistoryLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="ml-3 text-muted-foreground">加载中...</span>
+              </div>
+            ) : priceHistoryData.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                暂无价格历史数据
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-center">记录时间</TableHead>
+                    <TableHead className="text-center">
+                      {selectedMarket && parseOutcomes(selectedMarket)[0] || 'Yes'} 价格
+                    </TableHead>
+                    <TableHead className="text-center">
+                      {selectedMarket && parseOutcomes(selectedMarket)[1] || 'No'} 价格
+                    </TableHead>
+                    <TableHead className="text-center">价格和</TableHead>
+                    <TableHead className="text-right">交易量</TableHead>
+                    <TableHead className="text-right">流动性</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {priceHistoryData.map((record: PriceHistoryRecord) => {
+                    const historyPrices = parsePriceHistoryPrices(record.outcomePrices)
+                    return (
+                      <TableRow key={record.id}>
+                        <TableCell className="text-center text-sm">
+                          {new Date(record.recordedAt).toLocaleString('zh-CN', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                          })}
+                        </TableCell>
+                        <TableCell className="text-center font-mono">
+                          <span className="text-green-600">
+                            {historyPrices[0] !== undefined ? historyPrices[0] : '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center font-mono">
+                          <span className="text-red-600">
+                            {historyPrices[1] !== undefined ? historyPrices[1] : '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-muted-foreground">
+                          {historyPrices.length >= 2 
+                            ? (historyPrices[0] + historyPrices[1]).toFixed(6)
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {record.volume !== null 
+                            ? `$${Number(record.volume).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {record.liquidity !== null
+                            ? `$${Number(record.liquidity).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                            : '-'}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          
+          {priceHistoryData.length > 0 && (
+            <div className="pt-4 border-t text-sm text-muted-foreground text-center">
+              共 {priceHistoryData.length} 条记录
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
