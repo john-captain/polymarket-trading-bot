@@ -142,10 +142,27 @@ export class StorageQueue {
       !this.buffer.some(b => b.conditionId === m.conditionId)
     )
 
-    this.buffer.push(...newMarkets)
-    this.totalRecords += newMarkets.length
+    // 检查队列大小限制，超过时丢弃旧数据
+    const spaceAvailable = this.maxBufferSize - this.buffer.length
+    if (newMarkets.length > spaceAvailable) {
+      if (spaceAvailable <= 0) {
+        // 缓冲区已满，丢弃最旧的数据腾出空间
+        const dropCount = Math.min(newMarkets.length, this.buffer.length)
+        this.buffer.splice(0, dropCount)
+        console.warn(`⚠️ [StorageQueue] 缓冲区已满，丢弃 ${dropCount} 条旧数据`)
+      }
+    }
 
-    console.log(`📥 [StorageQueue] 添加 ${newMarkets.length} 条记录到缓冲区 (当前: ${this.buffer.length})`)
+    // 只添加能容纳的数量
+    const toAdd = newMarkets.slice(0, this.maxBufferSize - this.buffer.length)
+    this.buffer.push(...toAdd)
+    this.totalRecords += toAdd.length
+
+    if (toAdd.length < newMarkets.length) {
+      console.warn(`⚠️ [StorageQueue] 丢弃 ${newMarkets.length - toAdd.length} 条超出容量的数据`)
+    }
+
+    console.log(`📥 [StorageQueue] 添加 ${toAdd.length} 条记录到缓冲区 (当前: ${this.buffer.length}/${this.maxBufferSize})`)
 
     // 检查是否需要立即刷新
     if (this.buffer.length >= this.batchSize) {

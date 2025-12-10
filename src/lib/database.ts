@@ -624,22 +624,39 @@ export async function upsertMarket(market: MarketRecord): Promise<{ inserted: bo
 }
 
 /**
- * 批量保存市场数据
+ * 批量保存市场数据（只插入新市场，已存在的跳过）
  */
 export async function batchUpsertMarkets(markets: MarketRecord[]): Promise<{ inserted: number; updated: number }> {
-  let inserted = 0
-  let updated = 0
+  if (markets.length === 0) return { inserted: 0, updated: 0 }
   
-  for (const market of markets) {
-    const result = await upsertMarket(market)
-    if (result.inserted) {
+  const p = getPool()
+  
+  // 1. 批量查询已存在的 condition_id
+  const conditionIds = markets.map(m => m.conditionId)
+  const placeholders = conditionIds.map(() => '?').join(',')
+  const [existingRows] = await p.execute(
+    `SELECT condition_id FROM markets WHERE condition_id IN (${placeholders})`,
+    conditionIds
+  )
+  const existingIds = new Set((existingRows as any[]).map(r => r.condition_id))
+  
+  // 2. 过滤出新市场
+  const newMarkets = markets.filter(m => !existingIds.has(m.conditionId))
+  
+  // 3. 只插入新市场
+  let inserted = 0
+  for (const market of newMarkets) {
+    try {
+      await upsertMarket(market)
       inserted++
-    } else {
-      updated++
+    } catch (err) {
+      // 忽略插入错误（可能是并发重复）
+      console.warn(`⚠️ 插入市场 ${market.conditionId} 失败:`, err)
     }
   }
   
-  return { inserted, updated }
+  // updated = 已存在但跳过的数量（实际没有更新）
+  return { inserted, updated: existingIds.size }
 }
 
 /**
@@ -911,25 +928,46 @@ export async function recordPriceSnapshot(market: {
 }
 
 /**
- * 批量记录价格快照
+ * 批量记录价格快照（真正的批量 INSERT）
  */
 export async function batchRecordPriceSnapshots(markets: MarketRecord[]): Promise<number> {
-  let count = 0
+  if (markets.length === 0) return 0
+  
+  const p = getPool()
+  
+  // 构建批量 INSERT 语句
+  const columns = '(condition_id, outcome_prices, volume, volume_24hr, liquidity, best_bid, best_ask, spread, last_trade_price)'
+  const valuePlaceholder = '(?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  const placeholders = markets.map(() => valuePlaceholder).join(', ')
+  
+  const sql = `
+    INSERT INTO market_price_history ${columns}
+    VALUES ${placeholders}
+  `
+  
+  // 展平参数数组
+  const params: any[] = []
   for (const market of markets) {
-    await recordPriceSnapshot({
-      conditionId: market.conditionId,
-      outcomePrices: market.outcomePrices,
-      volume: market.volume || 0,
-      volume24hr: market.volume24hr || 0,
-      liquidity: market.liquidity || 0,
-      bestBid: market.bestBid,
-      bestAsk: market.bestAsk,
-      spread: market.spread,
-      lastTradePrice: market.lastTradePrice,
-    })
-    count++
+    params.push(
+      market.conditionId,
+      market.outcomePrices,
+      market.volume || 0,
+      market.volume24hr || 0,
+      market.liquidity || 0,
+      market.bestBid || null,
+      market.bestAsk || null,
+      market.spread || null,
+      market.lastTradePrice || null
+    )
   }
-  return count
+  
+  try {
+    const [result] = await p.execute(sql, params)
+    return (result as any).affectedRows
+  } catch (err) {
+    console.error('❌ 批量写入价格快照失败:', err)
+    return 0
+  }
 }
 
 /**
