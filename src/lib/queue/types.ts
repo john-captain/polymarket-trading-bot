@@ -31,7 +31,7 @@ export const DEFAULT_QUEUE_CONFIGS: Record<QueueName, QueueConfig> = {
     name: 'scan',
     concurrency: 1,
     maxSize: 1,
-    timeout: 120000,
+    timeout: 1200000, // 20 minutes
     autoStart: false,
   },
   storage: {
@@ -201,7 +201,7 @@ export const DEFAULT_SCAN_CONFIG: ScanConfig = {
   closed: 'false',
   maxPages: 100,        // 最多 100 页，覆盖 20k 市场
   orderbookConcurrency: 20,
-  scanInterval: 60000,  // 60秒扫描一轮（扫描16k市场需要时间）
+  scanInterval: 300000, // 5分钟扫描一轮（减轻服务器压力）
 }
 
 // ==================== 任务类型 ====================

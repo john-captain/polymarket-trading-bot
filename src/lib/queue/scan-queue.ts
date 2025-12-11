@@ -112,6 +112,8 @@ export class ScanQueue {
       timeout: this.config.timeout,
     })
 
+    console.log(`ℹ️ [ScanQueue] 配置的超时时间: ${this.config.timeout} ms`)
+
     // 监听队列事件
     this.queue.on('active', () => {
       if (this.state !== 'stopped' && this.state !== 'paused') {
@@ -265,8 +267,9 @@ export class ScanQueue {
         } else {
           offset += config.limit
           page++
-          // 添加小延迟避免限速
-          await this.sleep(100)
+          // 添加 10 秒延迟避免限速和服务器压力
+          console.log(`⏳ [ScanQueue] 等待 10 秒后继续下一页...`)
+          await this.sleep(10000)
         }
       }
 
