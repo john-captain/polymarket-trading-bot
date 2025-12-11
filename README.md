@@ -80,8 +80,6 @@ RPC_URL=https://polygon-rpc.com
 
 ```bash
 npm run dev
-
-taskkill /F /IM node.exe 2>$null; npm run dev  #重启开发服务器
 ```
 
 访问 http://localhost:3000 打开管理界面。
@@ -89,21 +87,23 @@ taskkill /F /IM node.exe 2>$null; npm run dev  #重启开发服务器
 ### 生产部署
 
 ```bash
-ss -ltnp | grep ':3000' || true
-kill -9 26109 && sleep 1 && ss -ltnp | grep ':3000' || true
-npm run start
-
-
-# 构建生产版本
+# 1. 构建生产版本
 npm run build
 
-# 使用 PM2 启动
+# 2. 首次启动（使用 PM2）
 pm2 start npm --name "polymarket-web" -- run start
 
-# 常用命令
-pm2 restart polymarket-web   # 重启
-pm2 logs polymarket-web      # 查看日志
-pm2 stop polymarket-web      # 停止
+# 3. 后续更新部署
+git pull                        # 拉取最新代码
+npm run build                   # 重新构建
+pm2 restart polymarket-web      # 重启服务
+
+# PM2 常用命令
+pm2 status                      # 查看服务状态
+pm2 logs polymarket-web         # 查看实时日志
+pm2 logs polymarket-web --lines 100  # 查看最近 100 行日志
+pm2 stop polymarket-web         # 停止服务
+pm2 delete polymarket-web       # 删除服务
 ```
 
 ### 其他命令
@@ -115,7 +115,7 @@ npm run gen-creds
 # 检查钱包余额
 npm run check-balance
 
-# arket_price_history 表中 outcome_prices 价格和不等于 1 的数据
+# 检查价格历史表中价格和异常的数据
 npm run check-price -- --threshold=0.0001 
 ```
 
@@ -180,6 +180,16 @@ polymarket-trading-bot/
 
 **USDC 合约**：`0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`（Polygon，6 位小数）
 
+## 代理配置
+
+API 请求支持通过代理访问（可选）：
+
+```bash
+# 在 .env 中配置
+HTTP_PROXY=http://127.0.0.1:7890    # HTTP 代理
+SOCKS_PROXY=socks5://127.0.0.1:7890 # SOCKS5 代理
+```
+
 ## 安全注意事项
 
 ⚠️ **重要：**
@@ -188,50 +198,16 @@ polymarket-trading-bot/
 - 首先使用小额测试
 - 在确认前审查所有交易
 
-## 依赖
+## 主要依赖
 
-- `next` - Next.js 15 框架
-- `react` - React 18
-- `@polymarket/clob-client` - Polymarket CLOB 客户端
-- `@ethersproject/wallet` - 以太坊钱包
-- `mysql2` - MySQL 数据库驱动
-- `@tanstack/react-query` - 数据获取
-- `zustand` - 状态管理
-- `tailwindcss` - CSS 框架
-- `shadcn/ui` - UI 组件库
-
-
-### 关键参数 (.env)
-
-```bash
-ARB_MIN_SPREAD=1.0      # 最小价差 (%)
-ARB_MIN_PROFIT=0.02     # 最小利润 ($)
-ARB_TRADE_AMOUNT=10.0   # 每边金额 ($)
-ARB_SCAN_INTERVAL=2000  # 扫描间隔 (ms)
-PRIVATE_KEY=0x...       # Polygon 钱包私钥
-
-# 代理配置 (可选)
-HTTP_PROXY=http://127.0.0.1:7890    # HTTP 代理
-SOCKS_PROXY=socks5://127.0.0.1:7890 # SOCKS5 代理
-```
-
-### 代理支持
-
-API 请求支持通过代理访问，实现在 `src/lib/arbitrage-scanner.ts`：
-
-```typescript
-import { SocksProxyAgent } from 'socks-proxy-agent'
-import { HttpsProxyAgent } from 'https-proxy-agent'
-
-// 根据环境变量自动选择代理类型
-const proxyUrl = process.env.SOCKS_PROXY || process.env.HTTP_PROXY
-const agent = proxyUrl?.startsWith('socks') 
-  ? new SocksProxyAgent(proxyUrl)
-  : new HttpsProxyAgent(proxyUrl)
-
-// 在 fetch 请求中使用
-const response = await fetch(url, { agent })
-```
+| 依赖 | 说明 |
+|------|------|
+| `next` | Next.js 15 框架 |
+| `react` | React 18 |
+| `@polymarket/clob-client` | Polymarket CLOB 客户端 |
+| `mysql2` | MySQL 数据库驱动 |
+| `@tanstack/react-query` | 数据获取 |
+| `tailwindcss` | CSS 框架 |
 
 ## 许可证
 
@@ -246,4 +222,4 @@ ISC
 
 ---
 
-**免责声明**：使用风险自负。本软件按原样提供，不提供任何保证。始终先用小额测试。
+**免责声明**：使用风险自负。本软件按原样提供，不提供任何保证。始终先用小额测试。始终先用小额测试。
