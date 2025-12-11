@@ -24,6 +24,8 @@ import type { GammaMarket } from '@/lib/api-client'
 
 /**
  * 将 GammaMarket 转换为 MarketData
+ * 
+ * 方案A：转换所有字段（静态+动态），存储队列负责分拆
  */
 function toMarketData(market: GammaMarket): MarketData {
   // 解析 outcomes
@@ -62,28 +64,95 @@ function toMarketData(market: GammaMarket): MarketData {
   }
 
   // 获取市场数据，处理可能的字段名差异
-  const marketAny = market as any
+  const m = market as any
+  
+  // 辅助函数：安全解析数字
+  const parseNum = (val: any): number | undefined => 
+    val !== undefined && val !== null ? parseFloat(String(val)) : undefined
 
   return {
+    // ===== 静态字段 =====
     conditionId: market.conditionId || '',
     question: market.question || '',
     slug: market.slug || '',
     category: market.category,
     outcomes,
-    outcomePrices,
     clobTokenIds,
-    volume: parseFloat(String(market.volume || market.volumeNum || 0)),
-    volume24hr: parseFloat(String(market.volume24hr || marketAny.volume_24hr || 0)),
-    liquidity: parseFloat(String(market.liquidity || market.liquidityNum || 0)),
-    bestBid: marketAny.bestBid !== undefined ? parseFloat(String(marketAny.bestBid)) : undefined,
-    bestAsk: marketAny.bestAsk !== undefined ? parseFloat(String(marketAny.bestAsk)) : undefined,
-    spread: marketAny.spread !== undefined ? parseFloat(String(marketAny.spread)) : undefined,
     endDate: market.endDate,
     active: Boolean(market.active),
     closed: Boolean(market.closed),
     restricted: Boolean(market.restricted),
     enableOrderBook: Boolean(market.enableOrderBook),
-    image: marketAny.image,
+    image: m.image,
+    
+    // 交易配置 (静态)
+    acceptingOrders: m.acceptingOrders !== false,
+    acceptingOrdersTimestamp: m.acceptingOrdersTimestamp,
+    orderMinSize: parseNum(m.orderMinSize) ?? 5,
+    orderPriceMinTickSize: parseNum(m.orderPriceMinTickSize) ?? 0.01,
+    negRisk: Boolean(m.negRisk),
+    negRiskMarketId: m.negRiskMarketID || m.negRiskMarketId,
+    negRiskRequestId: m.negRiskRequestID || m.negRiskRequestId,
+    
+    // 市场审核状态 (静态)
+    approved: Boolean(m.approved),
+    ready: Boolean(m.ready),
+    funded: Boolean(m.funded),
+    featured: Boolean(m.featured),
+    isNew: Boolean(m.new),
+    
+    // UMA 预言机相关 (静态)
+    umaBond: m.umaBond,
+    umaReward: m.umaReward,
+    resolvedBy: m.resolvedBy,
+    resolutionSource: m.resolutionSource,
+    submittedBy: m.submitted_by,
+    
+    // 分组/展示相关 (静态)
+    groupItemTitle: m.groupItemTitle,
+    groupItemThreshold: m.groupItemThreshold,
+    customLiveness: m.customLiveness !== undefined ? parseInt(String(m.customLiveness)) : 0,
+    
+    // ===== 动态字段 =====
+    
+    // 价格数据
+    outcomePrices,
+    bestBid: parseNum(m.bestBid),
+    bestAsk: parseNum(m.bestAsk),
+    spread: parseNum(m.spread),
+    lastTradePrice: parseNum(m.lastTradePrice),
+    
+    // 价格变化
+    oneHourPriceChange: parseNum(m.onehourpricechange || m.oneHourPriceChange),
+    oneDayPriceChange: parseNum(m.onedaypricechange || m.oneDayPriceChange),
+    oneWeekPriceChange: parseNum(m.oneweekpricechange || m.oneWeekPriceChange),
+    oneMonthPriceChange: parseNum(m.onemonthpricechange || m.oneMonthPriceChange),
+    oneYearPriceChange: parseNum(m.oneyearpricechange || m.oneYearPriceChange),
+    
+    // 交易量
+    volume: parseFloat(String(market.volume || m.volumeNum || 0)),
+    volume24hr: parseFloat(String(market.volume24hr || m.volume_24hr || 0)),
+    volume1wk: parseNum(m.volume_1wk || m.volume1wk),
+    volume1mo: parseNum(m.volume_1mo || m.volume1mo),
+    volume1yr: parseNum(m.volume_1yr || m.volume1yr),
+    
+    // AMM vs CLOB 交易量分拆
+    volume1wkAmm: parseNum(m.volume_1wk_amm || m.volume1wkAmm),
+    volume1moAmm: parseNum(m.volume_1mo_amm || m.volume1moAmm),
+    volume1yrAmm: parseNum(m.volume_1yr_amm || m.volume1yrAmm),
+    volume1wkClob: parseNum(m.volume_1wk_clob || m.volume1wkClob),
+    volume1moClob: parseNum(m.volume_1mo_clob || m.volume1moClob),
+    volume1yrClob: parseNum(m.volume_1yr_clob || m.volume1yrClob),
+    volumeClob: parseNum(m.volumeClob || m.volume_clob),
+    
+    // 流动性
+    liquidity: parseFloat(String(market.liquidity || m.liquidityNum || 0)),
+    liquidityAmm: parseNum(m.liquidityAmm || m.liquidity_amm),
+    liquidityClob: parseNum(m.liquidityClob || m.liquidity_clob),
+    
+    // 其他动态数据
+    competitive: parseNum(m.competitive),
+    commentCount: m.commentCount !== undefined ? parseInt(String(m.commentCount)) : undefined,
   }
 }
 
@@ -129,7 +198,11 @@ export class ScanQueue {
     this.queue.on('error', (error) => {
       this.errorCount++
       console.error('❌ [ScanQueue] 任务错误:', error)
-      this.emitEvent('task:error', { error: error.message })
+      console.error('❌ [ScanQueue] 错误堆栈:', error instanceof Error ? error.stack : '无堆栈信息')
+      this.emitEvent('task:error', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
     })
   }
 
@@ -248,8 +321,17 @@ export class ScanQueue {
 
         const rawMarkets = response.data || []
         
-        // 转换为 MarketData
-        const markets = rawMarkets.map(toMarketData)
+        // 转换为 MarketData（添加错误处理）
+        const markets: MarketData[] = []
+        for (let i = 0; i < rawMarkets.length; i++) {
+          try {
+            markets.push(toMarketData(rawMarkets[i]))
+          } catch (error) {
+            this.errorCount++
+            console.error(`❌ [ScanQueue] 第 ${page} 页第 ${i+1} 条数据转换失败:`, error)
+            console.error('   问题数据:', JSON.stringify(rawMarkets[i], null, 2))
+          }
+        }
         
         // 每 10 页输出一次进度
         if (page % 10 === 0 || rawMarkets.length < config.limit) {
@@ -265,7 +347,13 @@ export class ScanQueue {
 
         // 🔥 等待所有下游队列处理完成
         if (this.waitForQueuesIdle) {
-          await this.waitForQueuesIdle()
+          try {
+            await this.waitForQueuesIdle()
+          } catch (error) {
+            this.errorCount++
+            console.error(`❌ [ScanQueue] 等待队列空闲时出错:`, error)
+            // 继续执行，不中断扫描
+          }
         }
 
         // 检查是否还有更多

@@ -231,9 +231,14 @@ export interface StorageTask {
 }
 
 /**
- * 市场数据 (简化版，用于队列传递)
+ * 市场数据 (完整版，用于队列传递)
+ * 
+ * 包含静态字段（存入 markets 表）和动态字段（存入 market_price_history 表）
+ * 扫描队列从 API 获取完整数据，存储队列负责分拆到两个表
  */
 export interface MarketData {
+  // ===== 静态字段 (存入 markets 表) =====
+  
   /** 条件 ID (唯一标识) */
   conditionId: string
   /** 市场问题 */
@@ -244,22 +249,8 @@ export interface MarketData {
   category?: string
   /** 结果选项 */
   outcomes: string[]
-  /** 结果价格 */
-  outcomePrices: number[]
   /** Token IDs */
   clobTokenIds?: string[]
-  /** 交易量 */
-  volume: number
-  /** 24h 交易量 */
-  volume24hr: number
-  /** 流动性 */
-  liquidity: number
-  /** 最佳买价 */
-  bestBid?: number
-  /** 最佳卖价 */
-  bestAsk?: number
-  /** 价差 */
-  spread?: number
   /** 结束日期 */
   endDate?: string
   /** 是否活跃 */
@@ -272,6 +263,122 @@ export interface MarketData {
   enableOrderBook: boolean
   /** 图片 URL */
   image?: string
+  
+  // 交易配置 (静态)
+  /** 是否接受订单 */
+  acceptingOrders?: boolean
+  /** 开始接单时间 */
+  acceptingOrdersTimestamp?: string
+  /** 最小订单大小 (USDC) */
+  orderMinSize?: number
+  /** 价格最小变动单位 */
+  orderPriceMinTickSize?: number
+  /** 是否负风险市场 */
+  negRisk?: boolean
+  /** 负风险市场 ID */
+  negRiskMarketId?: string
+  /** 负风险请求 ID */
+  negRiskRequestId?: string
+  
+  // 市场审核状态 (静态)
+  /** 是否已审核 */
+  approved?: boolean
+  /** 是否就绪 */
+  ready?: boolean
+  /** 是否已注资 */
+  funded?: boolean
+  /** 是否推荐/置顶 */
+  featured?: boolean
+  /** 是否新市场 */
+  isNew?: boolean
+  
+  // UMA 预言机相关 (静态)
+  /** UMA 保证金金额 */
+  umaBond?: string
+  /** UMA 奖励金额 */
+  umaReward?: string
+  /** 解决者地址 */
+  resolvedBy?: string
+  /** 结果来源说明 */
+  resolutionSource?: string
+  /** 提交者地址 */
+  submittedBy?: string
+  
+  // 分组/展示相关 (静态)
+  /** 分组显示标题 */
+  groupItemTitle?: string
+  /** 分组阈值 */
+  groupItemThreshold?: string
+  /** 自定义活跃度 */
+  customLiveness?: number
+  
+  // ===== 动态字段 (存入 market_price_history 表) =====
+  
+  // 价格数据
+  /** 结果价格 */
+  outcomePrices: number[]
+  /** 最佳买价 */
+  bestBid?: number
+  /** 最佳卖价 */
+  bestAsk?: number
+  /** 价差 */
+  spread?: number
+  /** 最后成交价 */
+  lastTradePrice?: number
+  
+  // 价格变化
+  /** 1小时价格变化 */
+  oneHourPriceChange?: number
+  /** 24小时价格变化 */
+  oneDayPriceChange?: number
+  /** 7天价格变化 */
+  oneWeekPriceChange?: number
+  /** 30天价格变化 */
+  oneMonthPriceChange?: number
+  /** 年价格变化 */
+  oneYearPriceChange?: number
+  
+  // 交易量
+  /** 总交易量 */
+  volume: number
+  /** 24h 交易量 */
+  volume24hr: number
+  /** 7天交易量 */
+  volume1wk?: number
+  /** 30天交易量 */
+  volume1mo?: number
+  /** 年交易量 */
+  volume1yr?: number
+  
+  // AMM vs CLOB 交易量分拆
+  /** 7天 AMM 交易量 */
+  volume1wkAmm?: number
+  /** 30天 AMM 交易量 */
+  volume1moAmm?: number
+  /** 年 AMM 交易量 */
+  volume1yrAmm?: number
+  /** 7天 CLOB 交易量 */
+  volume1wkClob?: number
+  /** 30天 CLOB 交易量 */
+  volume1moClob?: number
+  /** 年 CLOB 交易量 */
+  volume1yrClob?: number
+  /** CLOB 总交易量 */
+  volumeClob?: number
+  
+  // 流动性
+  /** 总流动性 */
+  liquidity: number
+  /** AMM 流动性 */
+  liquidityAmm?: number
+  /** CLOB 流动性 */
+  liquidityClob?: number
+  
+  // 其他动态数据
+  /** 竞争度 */
+  competitive?: number
+  /** 评论数 */
+  commentCount?: number
 }
 
 // ==================== 事件类型 ====================

@@ -1,13 +1,35 @@
 /**
- * 存储队列
+ * 存储队列 - 数据库批量写入管理器
  * 
- * 负责将市场数据批量写入 MySQL 数据库
- * 支持批量合并、去重、背压控制
+ * 核心功能：
+ * 1. 批量缓冲 - 收集市场数据到内存缓冲区，减少数据库操作次数
+ * 2. 自动刷新 - 达到批次大小或定时触发，自动写入数据库
+ * 3. 双表写入 - markets 表存静态数据，market_price_history 表存动态数据
+ * 4. INSERT IGNORE - 新数据插入，重复数据跳过（基于 conditionId）
+ * 5. 背压控制 - 缓冲区超过 80% 时发出背压信号，暂停上游扫描
+ * 6. 去重机制 - 缓冲区内自动去重，避免重复写入
+ * 7. 溢出保护 - 缓冲区满时自动丢弃最旧数据，保证系统不阻塞
+ * 
+ * 方案A 数据分离：
+ * - markets 表：只存储静态字段，INSERT IGNORE（不更新）
+ * - market_price_history 表：存储所有动态字段，每次扫描都 INSERT
+ * 
+ * 配置参数：
+ * - batchSize: 50 条/批次 - 每次写入数据库的记录数
+ * - flushInterval: 5000ms - 定时刷新间隔
+ * - maxBufferSize: 500 条 - 缓冲区最大容量
+ * - concurrency: 10 - 并发写入任务数
+ * 
+ * 数据流：
+ * ScanQueue (200条) → add() → buffer[] → flush() → MySQL
+ *                                ↓
+ *                        markets 表 (INSERT IGNORE 静态数据)
+ *                        market_price_history 表 (INSERT 动态数据)
  */
 
 import PQueue from 'p-queue'
 import { batchUpsertMarkets, batchRecordPriceSnapshots } from '@/lib/database'
-import type { MarketRecord } from '@/lib/database'
+import type { MarketRecord, PriceHistoryRecord } from '@/lib/database'
 import type {
   QueueConfig,
   QueueStatus,
@@ -35,27 +57,21 @@ type SimpleEventListener = (data: any) => void
 // ==================== 类型转换 ====================
 
 /**
- * 将 MarketData 转换为 MarketRecord (数据库格式)
+ * 将 MarketData 转换为 MarketRecord (静态数据)
+ * 
+ * 方案A：只保留静态字段，动态字段存入 market_price_history
  */
 function toMarketRecord(market: MarketData): MarketRecord {
   return {
+    // 基础标识
     conditionId: market.conditionId,
     question: market.question,
     slug: market.slug,
     category: market.category,
     
-    // outcomes 和 prices 转为 JSON
+    // outcomes 转为 JSON（静态，不含价格）
     outcomes: JSON.stringify(market.outcomes),
-    outcomePrices: JSON.stringify(market.outcomePrices),
     tokens: market.clobTokenIds ? JSON.stringify(market.clobTokenIds) : '[]',
-    
-    // 数值字段
-    volume: market.volume,
-    volume24hr: market.volume24hr,
-    liquidity: market.liquidity,
-    bestBid: market.bestBid,
-    bestAsk: market.bestAsk,
-    spread: market.spread,
     
     // 日期
     endDate: market.endDate,
@@ -68,6 +84,84 @@ function toMarketRecord(market: MarketData): MarketRecord {
     
     // 媒体
     image: market.image,
+    
+    // 交易配置（静态）
+    acceptingOrders: market.acceptingOrders,
+    acceptingOrdersTimestamp: market.acceptingOrdersTimestamp,
+    orderMinSize: market.orderMinSize,
+    orderPriceMinTickSize: market.orderPriceMinTickSize,
+    negRisk: market.negRisk,
+    negRiskMarketId: market.negRiskMarketId,
+    negRiskRequestId: market.negRiskRequestId,
+    
+    // 市场审核状态
+    approved: market.approved,
+    ready: market.ready,
+    funded: market.funded,
+    featured: market.featured,
+    isNew: market.isNew,
+    
+    // UMA 预言机相关
+    umaBond: market.umaBond,
+    umaReward: market.umaReward,
+    resolvedBy: market.resolvedBy,
+    resolutionSource: market.resolutionSource,
+    submittedBy: market.submittedBy,
+    
+    // 分组/展示相关
+    groupItemTitle: market.groupItemTitle,
+    groupItemThreshold: market.groupItemThreshold,
+    customLiveness: market.customLiveness,
+  }
+}
+
+/**
+ * 将 MarketData 转换为 PriceHistoryRecord (动态数据)
+ * 
+ * 方案A：包含所有动态字段，每次扫描都生成新快照
+ */
+function toPriceHistoryRecord(market: MarketData): Omit<PriceHistoryRecord, 'id' | 'recordedAt'> {
+  return {
+    conditionId: market.conditionId,
+    
+    // 价格数据
+    outcomePrices: JSON.stringify(market.outcomePrices),
+    bestBid: market.bestBid,
+    bestAsk: market.bestAsk,
+    spread: market.spread,
+    lastTradePrice: market.lastTradePrice,
+    
+    // 价格变化
+    oneHourPriceChange: market.oneHourPriceChange,
+    oneDayPriceChange: market.oneDayPriceChange,
+    oneWeekPriceChange: market.oneWeekPriceChange,
+    oneMonthPriceChange: market.oneMonthPriceChange,
+    oneYearPriceChange: market.oneYearPriceChange,
+    
+    // 交易量
+    volume: market.volume,
+    volume24hr: market.volume24hr,
+    volume1wk: market.volume1wk,
+    volume1mo: market.volume1mo,
+    volume1yr: market.volume1yr,
+    
+    // AMM vs CLOB 交易量分拆
+    volume1wkAmm: market.volume1wkAmm,
+    volume1moAmm: market.volume1moAmm,
+    volume1yrAmm: market.volume1yrAmm,
+    volume1wkClob: market.volume1wkClob,
+    volume1moClob: market.volume1moClob,
+    volume1yrClob: market.volume1yrClob,
+    volumeClob: market.volumeClob,
+    
+    // 流动性
+    liquidity: market.liquidity,
+    liquidityAmm: market.liquidityAmm,
+    liquidityClob: market.liquidityClob,
+    
+    // 其他动态数据
+    competitive: market.competitive,
+    commentCount: market.commentCount,
   }
 }
 
@@ -172,6 +266,10 @@ export class StorageQueue {
 
   /**
    * 刷新缓冲区 - 将数据写入数据库
+   * 
+   * 方案A 数据分离：
+   * 1. 静态数据 → markets 表 (INSERT IGNORE)
+   * 2. 动态数据 → market_price_history 表 (INSERT)
    */
   async flush(): Promise<StorageTaskResult | null> {
     // 防止并发刷新
@@ -186,27 +284,30 @@ export class StorageQueue {
     try {
       // 取出缓冲区数据
       const batch = this.buffer.splice(0, this.batchSize)
-      const records = batch.map(toMarketRecord)
+      
+      // 分离静态和动态数据
+      const staticRecords = batch.map(toMarketRecord)
+      const dynamicRecords = batch.map(toPriceHistoryRecord)
 
-      console.log(`💾 [StorageQueue] 开始保存批次 ${batchId} (${records.length} 条)`)
+      console.log(`💾 [StorageQueue] 开始保存批次 ${batchId} (${batch.length} 条)`)
       this.state = 'running'
-      this.emitEvent('task:start', { batchId, count: records.length })
+      this.emitEvent('task:start', { batchId, count: batch.length })
 
-      // 执行批量写入（市场主表 - UPSERT）
+      // 1. 写入静态数据（市场主表 - INSERT IGNORE）
       const result = await this.queue.add(async () => {
-        return await batchUpsertMarkets(records)
+        return await batchUpsertMarkets(staticRecords)
       })
 
-      // 同时记录价格历史（追加写入，用于回测）
+      // 2. 写入动态数据（价格历史表 - INSERT）
       const priceCount = await this.queue.add(async () => {
-        return await batchRecordPriceSnapshots(records)
+        return await batchRecordPriceSnapshots(dynamicRecords)
       })
 
       const duration = Date.now() - startTime
       const taskResult: StorageTaskResult = {
         batchId,
         inserted: result?.inserted ?? 0,
-        updated: result?.updated ?? 0,
+        updated: result?.updated ?? 0,  // 方案A 中应该始终为 0
         failed: 0,
         duration,
         priceSnapshots: priceCount ?? 0,
@@ -218,7 +319,7 @@ export class StorageQueue {
 
       console.log(
         `✅ [StorageQueue] 批次 ${batchId} 完成: ` +
-        `新增 ${taskResult.inserted}, 更新 ${taskResult.updated}, 价格快照 ${priceCount}, 耗时 ${duration}ms`
+        `新增 ${taskResult.inserted}, 跳过 ${taskResult.updated}, 价格快照 ${priceCount}, 耗时 ${duration}ms`
       )
 
       this.emitEvent('task:complete', taskResult)

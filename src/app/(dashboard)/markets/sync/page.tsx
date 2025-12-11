@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { RefreshCw, Search, Database, ChevronLeft, ChevronRight, TrendingUp, Activity, Lock, Unlock, ArrowUpRight, ArrowDownRight, Clock, Filter, Settings2, X, Copy, Check, History } from "lucide-react"
+import { RefreshCw, Search, Database, ChevronLeft, ChevronRight, TrendingUp, Activity, Lock, Unlock, ArrowUpRight, ArrowDownRight, Clock, Filter, Settings2, X, Copy, Check, History, Globe } from "lucide-react"
 import {
   MARKET_STATUS_OPTIONS,
   MARKET_SORT_OPTIONS,
@@ -52,13 +52,37 @@ interface MarketStats {
   categories?: { category: string; count: number }[]
 }
 
+/**
+ * 市场数据类型 - 方案A
+ * 
+ * 静态数据来自 markets 表
+ * 动态数据来自 market_price_history 表（最新快照）
+ */
 interface Market {
+  // 静态字段（来自 markets 表）
   id: number
   conditionId: string
+  questionId?: string
   slug: string
   question: string
+  description?: string
   category: string
   outcomes: string | string[]
+  tokens: string | string[]
+  endDate: string | null
+  active: boolean | number
+  closed: boolean | number
+  restricted: boolean | number
+  enableOrderBook: boolean | number
+  acceptingOrders: boolean | number
+  orderMinSize?: number
+  orderPriceMinTickSize?: number
+  negRisk: boolean | number
+  image: string | null
+  syncedAt: string
+  createdAt: string
+  
+  // 动态字段（来自 market_price_history 表最新快照）
   outcomePrices: string | number[]
   volume: number
   volume24hr: number
@@ -70,28 +94,48 @@ interface Market {
   lastTradePrice: number | null
   oneDayPriceChange: number | null
   oneWeekPriceChange: number | null
-  endDate: string | null
-  active: boolean | number
-  closed: boolean | number
-  restricted: boolean | number
-  enableOrderBook: boolean | number
-  image: string | null
-  createdAt: string
-  updatedAt: string
+  priceRecordedAt: string | null  // 价格快照记录时间
 }
 
-// 价格历史记录类型
+/**
+ * 价格历史记录类型 - 方案A
+ * 
+ * 包含所有动态字段的完整快照
+ */
 interface PriceHistoryRecord {
   id: number
   conditionId: string
+  
+  // 价格数据
   outcomePrices: string
-  volume: number
-  volume24hr: number
-  liquidity: number
   bestBid: number | null
   bestAsk: number | null
   spread: number | null
   lastTradePrice: number | null
+  
+  // 价格变化
+  oneHourPriceChange: number | null
+  oneDayPriceChange: number | null
+  oneWeekPriceChange: number | null
+  oneMonthPriceChange: number | null
+  oneYearPriceChange: number | null
+  
+  // 交易量
+  volume: number
+  volume24hr: number
+  volume1wk: number | null
+  volume1mo: number | null
+  volume1yr: number | null
+  
+  // 流动性
+  liquidity: number
+  liquidityAmm: number | null
+  liquidityClob: number | null
+  
+  // 其他
+  competitive: number | null
+  commentCount: number | null
+  
   recordedAt: string
 }
 
@@ -333,11 +377,12 @@ export default function MarketSyncPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">受限市场</CardTitle>
-            <Lock className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-sm font-medium" title="仅限非美国用户交易">地理受限</CardTitle>
+            <Globe className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-500">{stats?.restricted || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">非美国用户可交易</p>
           </CardContent>
         </Card>
 
@@ -671,7 +716,7 @@ export default function MarketSyncPage() {
 
       {/* 价格历史弹窗 */}
       <Dialog open={priceHistoryOpen} onOpenChange={setPriceHistoryOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -704,7 +749,9 @@ export default function MarketSyncPage() {
                       {selectedMarket && parseOutcomes(selectedMarket)[1] || 'No'} 价格
                     </TableHead>
                     <TableHead className="text-center">价格和</TableHead>
+                    <TableHead className="text-center">24h涨跌</TableHead>
                     <TableHead className="text-right">交易量</TableHead>
+                    <TableHead className="text-right">24h交易量</TableHead>
                     <TableHead className="text-right">流动性</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -724,22 +771,30 @@ export default function MarketSyncPage() {
                         </TableCell>
                         <TableCell className="text-center font-mono">
                           <span className="text-green-600">
-                            {historyPrices[0] !== undefined ? historyPrices[0] : '-'}
+                            {historyPrices[0] !== undefined ? (historyPrices[0] * 100).toFixed(2) + '¢' : '-'}
                           </span>
                         </TableCell>
                         <TableCell className="text-center font-mono">
                           <span className="text-red-600">
-                            {historyPrices[1] !== undefined ? historyPrices[1] : '-'}
+                            {historyPrices[1] !== undefined ? (historyPrices[1] * 100).toFixed(2) + '¢' : '-'}
                           </span>
                         </TableCell>
                         <TableCell className="text-center font-mono text-muted-foreground">
                           {historyPrices.length >= 2 
-                            ? (historyPrices[0] + historyPrices[1]).toFixed(6)
+                            ? ((historyPrices[0] + historyPrices[1]) * 100).toFixed(2) + '¢'
                             : '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {formatPriceChange(record.oneDayPriceChange)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {record.volume !== null 
                             ? `$${Number(record.volume).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {record.volume24hr !== null && record.volume24hr > 0
+                            ? <span className="text-green-600">${Number(record.volume24hr).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                             : '-'}
                         </TableCell>
                         <TableCell className="text-right font-mono">

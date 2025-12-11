@@ -267,75 +267,71 @@ export async function closeDatabase(): Promise<void> {
 /**
  * 完整的市场记录接口 - 包含 Gamma API 返回的所有字段
  */
+/**
+ * 市场静态数据 - 仅存储不常变化的字段
+ * 
+ * 方案A：完全分离静态/动态数据
+ * - markets 表只 INSERT，不 UPDATE
+ * - 动态数据全部存入 market_price_history 表
+ * 
+ * 移除的动态字段 (已迁移到 PriceHistoryRecord):
+ * - volume, volume24hr, volume1wk, volume1mo, volume1yr
+ * - volume1wkAmm/Clob, volume1moAmm/Clob, volume1yrAmm/Clob, volumeClob
+ * - liquidity, liquidityAmm, liquidityClob
+ * - bestBid, bestAsk, spread, lastTradePrice
+ * - oneHourPriceChange, oneDayPriceChange, oneWeekPriceChange, oneMonthPriceChange, oneYearPriceChange
+ * - outcomePrices, competitive, commentCount
+ */
 export interface MarketRecord {
   id?: number
-  // 基础标识
-  conditionId: string          // 唯一标识
+  
+  // ===== 基础标识 =====
+  conditionId: string          // 唯一标识 (主键)
   questionId?: string
   slug?: string
   
-  // 市场信息
+  // ===== 市场信息 =====
   question: string             // 市场问题
   description?: string
   category?: string
   marketType?: string          // normal, multi, etc.
   
-  // 日期
-  endDate?: string
-  startDate?: string
-  createdAt?: string
-  updatedAt?: string
-  closedTime?: string
+  // ===== 日期 (创建时确定，不变) =====
+  endDate?: string             // 结束日期
+  startDate?: string           // 开始日期
+  createdAt?: string           // API 创建时间
+  closedTime?: string          // 关闭时间
   
-  // 结果和价格
+  // ===== 结果选项 (静态) =====
   outcomes: string             // JSON: ["Yes", "No"] 或更多选项
-  outcomePrices: string        // JSON: ["0.65", "0.35"]
   tokens: string               // JSON: token IDs (clobTokenIds)
   
-  // 交易量
-  volume?: number              // 总交易量
-  volume24hr?: number          // 24小时交易量
-  volume1wk?: number           // 7天交易量
-  volume1mo?: number           // 30天交易量
-  volume1yr?: number           // 年交易量
-  
-  // AMM vs CLOB 交易量分拆
-  volume1wkAmm?: number
-  volume1moAmm?: number
-  volume1yrAmm?: number
-  volume1wkClob?: number
-  volume1moClob?: number
-  volume1yrClob?: number
-  
-  // 流动性
-  liquidity?: number           // 总流动性
-  liquidityAmm?: number
-  liquidityClob?: number
-  
-  // 价格信息
-  bestBid?: number
-  bestAsk?: number
-  spread?: number
-  lastTradePrice?: number      // 最后成交价
-  
-  // 价格变化
-  oneHourPriceChange?: number
-  oneDayPriceChange?: number   // 24小时价格变化
-  oneWeekPriceChange?: number  // 7天价格变化
-  oneMonthPriceChange?: number
-  oneYearPriceChange?: number
-  
-  // 状态标志
-  active: boolean
-  closed: boolean
-  archived?: boolean
-  restricted: boolean
-  enableOrderBook: boolean
+  // ===== 状态标志 =====
+  active: boolean              // 是否活跃
+  closed: boolean              // 是否已关闭
+  archived?: boolean           // 是否已归档
+  restricted: boolean          // 是否受限
+  enableOrderBook: boolean     // 是否启用订单簿
   fpmmLive?: boolean           // FPMM (AMM) 是否启用
   
-  // 功能标志
+  // ===== 交易配置 (静态，创建时确定) =====
+  acceptingOrders?: boolean    // 是否接受订单
+  acceptingOrdersTimestamp?: string // 开始接单时间
+  orderMinSize?: number        // 最小订单大小 (USDC)
+  orderPriceMinTickSize?: number // 价格最小变动单位
+  negRisk?: boolean            // 是否负风险市场
+  negRiskMarketId?: string     // 负风险市场 ID
+  negRiskRequestId?: string    // 负风险请求 ID
+  
+  // ===== 市场审核状态 =====
+  approved?: boolean           // 是否已审核
+  ready?: boolean              // 是否就绪
+  funded?: boolean             // 是否已注资
+  featured?: boolean           // 是否推荐/置顶
+  isNew?: boolean              // 是否新市场
+  
+  // ===== 功能标志 =====
   cyom?: boolean               // Create Your Own Market
-  competitive?: number
   rfqEnabled?: boolean         // Request For Quote
   holdingRewardsEnabled?: boolean
   feesEnabled?: boolean
@@ -345,43 +341,92 @@ export interface MarketRecord {
   pendingDeployment?: boolean
   deploying?: boolean
   
-  // 奖励配置
+  // ===== 奖励配置 =====
   rewardsMinSize?: number
   rewardsMaxSpread?: number
   
-  // 媒体
+  // ===== 媒体 =====
   image?: string               // 市场图片
   icon?: string
   twitterCardImage?: string
   
-  // 关联数据 (JSON 存储)
+  // ===== 关联数据 (JSON 存储) =====
   events?: string              // JSON: 关联的事件数据
   tags?: string                // JSON: 标签列表
   umaResolutionStatuses?: string // JSON: UMA 解决状态
   
-  // 其他元数据
+  // ===== UMA 预言机相关 =====
+  umaBond?: string             // UMA 保证金金额
+  umaReward?: string           // UMA 奖励金额
+  resolvedBy?: string          // 解决者地址
+  resolutionSource?: string    // 结果来源说明
+  submittedBy?: string         // 提交者地址
+  
+  // ===== 分组/展示相关 =====
+  groupItemTitle?: string      // 分组显示标题
+  groupItemThreshold?: string  // 分组阈值
+  customLiveness?: number      // 自定义活跃度
+  
+  // ===== 其他元数据 =====
   marketMakerAddress?: string
-  commentCount?: number
   mailchimpTag?: string
   
-  // 同步时间
-  syncedAt?: Date              // 本地同步时间
+  // ===== 同步时间 =====
+  syncedAt?: Date              // 首次同步时间
 }
 
 /**
- * 价格历史记录 - 存储动态变化的数据
+ * 价格历史记录 - 存储所有动态变化的数据
+ * 
+ * 方案A：完全分离静态/动态数据
+ * - 每次扫描都 INSERT 新记录（不更新）
+ * - 保留完整的价格和交易量历史
+ * - 用于趋势分析和套利检测
  */
 export interface PriceHistoryRecord {
   id?: number
-  conditionId: string          // 关联市场
-  outcomePrices: string        // JSON: 当时的价格
-  volume: number
-  volume24hr: number
-  liquidity: number
-  bestBid?: number
-  bestAsk?: number
-  spread?: number
-  lastTradePrice?: number
+  conditionId: string          // 关联市场 (外键)
+  
+  // ===== 价格数据 =====
+  outcomePrices: string        // JSON: ["0.65", "0.35"]
+  bestBid?: number             // 最佳买价
+  bestAsk?: number             // 最佳卖价
+  spread?: number              // 价差
+  lastTradePrice?: number      // 最后成交价
+  
+  // ===== 价格变化 =====
+  oneHourPriceChange?: number
+  oneDayPriceChange?: number   // 24小时价格变化
+  oneWeekPriceChange?: number  // 7天价格变化
+  oneMonthPriceChange?: number
+  oneYearPriceChange?: number
+  
+  // ===== 交易量 =====
+  volume: number               // 总交易量
+  volume24hr: number           // 24小时交易量
+  volume1wk?: number           // 7天交易量
+  volume1mo?: number           // 30天交易量
+  volume1yr?: number           // 年交易量
+  
+  // ===== AMM vs CLOB 交易量分拆 =====
+  volume1wkAmm?: number
+  volume1moAmm?: number
+  volume1yrAmm?: number
+  volume1wkClob?: number
+  volume1moClob?: number
+  volume1yrClob?: number
+  volumeClob?: number          // CLOB 总交易量
+  
+  // ===== 流动性 =====
+  liquidity: number            // 总流动性
+  liquidityAmm?: number
+  liquidityClob?: number
+  
+  // ===== 其他动态数据 =====
+  competitive?: number         // 竞争度
+  commentCount?: number        // 评论数
+  
+  // ===== 记录时间 =====
   recordedAt: Date             // 记录时间
 }
 
@@ -406,115 +451,52 @@ export async function initMarketsTable(): Promise<void> {
 }
 
 /**
- * 保存或更新市场数据 (Upsert) - 完整字段版本
+ * 插入市场静态数据 (INSERT IGNORE)
+ * 
+ * 方案A：只存储静态数据，动态数据存入 market_price_history
+ * - 使用 INSERT IGNORE 忽略已存在的记录
+ * - 不再 UPDATE，避免覆盖历史数据
+ * - 只存储创建时不变的字段
  */
-export async function upsertMarket(market: MarketRecord): Promise<{ inserted: boolean; id: number }> {
+export async function insertMarket(market: MarketRecord): Promise<{ inserted: boolean; id: number }> {
   const p = getPool()
   const sql = `
-    INSERT INTO markets (
+    INSERT IGNORE INTO markets (
       condition_id, question_id, slug, question, description, category, market_type,
-      end_date, start_date, created_at_api, updated_at_api, closed_time,
-      outcomes, outcome_prices, tokens,
-      volume, volume_24hr, volume_1wk, volume_1mo, volume_1yr,
-      volume_1wk_amm, volume_1mo_amm, volume_1yr_amm,
-      volume_1wk_clob, volume_1mo_clob, volume_1yr_clob,
-      liquidity, liquidity_amm, liquidity_clob,
-      best_bid, best_ask, spread, last_trade_price,
-      one_hour_price_change, one_day_price_change, one_week_price_change, one_month_price_change, one_year_price_change,
+      end_date, start_date, created_at_api, closed_time,
+      outcomes, tokens,
       active, closed, archived, restricted, enable_order_book, fpmm_live,
-      cyom, competitive, rfq_enabled, holding_rewards_enabled, fees_enabled,
+      accepting_orders, accepting_orders_timestamp, order_min_size, order_price_min_tick_size,
+      neg_risk, neg_risk_market_id, neg_risk_request_id,
+      approved, ready, funded, featured, is_new,
+      cyom, rfq_enabled, holding_rewards_enabled, fees_enabled,
       neg_risk_other, clear_book_on_start, manual_activation, pending_deployment, deploying,
       rewards_min_size, rewards_max_spread,
       image, icon, twitter_card_image,
       events, tags, uma_resolution_statuses,
-      market_maker_address, comment_count, mailchimp_tag,
+      uma_bond, uma_reward, resolved_by, resolution_source, submitted_by,
+      group_item_title, group_item_threshold, custom_liveness,
+      market_maker_address, mailchimp_tag,
       synced_at
     )
     VALUES (
       ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?,
-      ?, ?, ?,
-      ?, ?, ?, ?, ?,
-      ?, ?, ?,
-      ?, ?, ?,
-      ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?, ?,
+      ?, ?,
       ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?,
       ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?,
       ?, ?, ?,
       ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?, ?,
+      ?, ?,
       CURRENT_TIMESTAMP
     )
-    ON DUPLICATE KEY UPDATE
-      question_id = VALUES(question_id),
-      slug = VALUES(slug),
-      question = VALUES(question),
-      description = VALUES(description),
-      category = VALUES(category),
-      market_type = VALUES(market_type),
-      end_date = VALUES(end_date),
-      start_date = VALUES(start_date),
-      created_at_api = VALUES(created_at_api),
-      updated_at_api = VALUES(updated_at_api),
-      closed_time = VALUES(closed_time),
-      outcomes = VALUES(outcomes),
-      outcome_prices = VALUES(outcome_prices),
-      tokens = VALUES(tokens),
-      volume = VALUES(volume),
-      volume_24hr = VALUES(volume_24hr),
-      volume_1wk = VALUES(volume_1wk),
-      volume_1mo = VALUES(volume_1mo),
-      volume_1yr = VALUES(volume_1yr),
-      volume_1wk_amm = VALUES(volume_1wk_amm),
-      volume_1mo_amm = VALUES(volume_1mo_amm),
-      volume_1yr_amm = VALUES(volume_1yr_amm),
-      volume_1wk_clob = VALUES(volume_1wk_clob),
-      volume_1mo_clob = VALUES(volume_1mo_clob),
-      volume_1yr_clob = VALUES(volume_1yr_clob),
-      liquidity = VALUES(liquidity),
-      liquidity_amm = VALUES(liquidity_amm),
-      liquidity_clob = VALUES(liquidity_clob),
-      best_bid = VALUES(best_bid),
-      best_ask = VALUES(best_ask),
-      spread = VALUES(spread),
-      last_trade_price = VALUES(last_trade_price),
-      one_hour_price_change = VALUES(one_hour_price_change),
-      one_day_price_change = VALUES(one_day_price_change),
-      one_week_price_change = VALUES(one_week_price_change),
-      one_month_price_change = VALUES(one_month_price_change),
-      one_year_price_change = VALUES(one_year_price_change),
-      active = VALUES(active),
-      closed = VALUES(closed),
-      archived = VALUES(archived),
-      restricted = VALUES(restricted),
-      enable_order_book = VALUES(enable_order_book),
-      fpmm_live = VALUES(fpmm_live),
-      cyom = VALUES(cyom),
-      competitive = VALUES(competitive),
-      rfq_enabled = VALUES(rfq_enabled),
-      holding_rewards_enabled = VALUES(holding_rewards_enabled),
-      fees_enabled = VALUES(fees_enabled),
-      neg_risk_other = VALUES(neg_risk_other),
-      clear_book_on_start = VALUES(clear_book_on_start),
-      manual_activation = VALUES(manual_activation),
-      pending_deployment = VALUES(pending_deployment),
-      deploying = VALUES(deploying),
-      rewards_min_size = VALUES(rewards_min_size),
-      rewards_max_spread = VALUES(rewards_max_spread),
-      image = VALUES(image),
-      icon = VALUES(icon),
-      twitter_card_image = VALUES(twitter_card_image),
-      events = VALUES(events),
-      tags = VALUES(tags),
-      uma_resolution_statuses = VALUES(uma_resolution_statuses),
-      market_maker_address = VALUES(market_maker_address),
-      comment_count = VALUES(comment_count),
-      mailchimp_tag = VALUES(mailchimp_tag),
-      synced_at = CURRENT_TIMESTAMP
   `
   
   // 解析日期
@@ -534,46 +516,11 @@ export async function upsertMarket(market: MarketRecord): Promise<{ inserted: bo
     parseDate(market.endDate),
     parseDate(market.startDate),
     parseDate(market.createdAt),
-    parseDate(market.updatedAt),
     parseDate(market.closedTime),
     
-    // 结果和价格
+    // 结果选项 (静态)
     market.outcomes,
-    market.outcomePrices,
     market.tokens,
-    
-    // 交易量
-    market.volume || 0,
-    market.volume24hr || 0,
-    market.volume1wk || 0,
-    market.volume1mo || 0,
-    market.volume1yr || 0,
-    
-    // AMM vs CLOB 交易量
-    market.volume1wkAmm || 0,
-    market.volume1moAmm || 0,
-    market.volume1yrAmm || 0,
-    market.volume1wkClob || 0,
-    market.volume1moClob || 0,
-    market.volume1yrClob || 0,
-    
-    // 流动性
-    market.liquidity || 0,
-    market.liquidityAmm || 0,
-    market.liquidityClob || 0,
-    
-    // 价格信息
-    market.bestBid || null,
-    market.bestAsk || null,
-    market.spread || null,
-    market.lastTradePrice || null,
-    
-    // 价格变化
-    market.oneHourPriceChange || null,
-    market.oneDayPriceChange || null,
-    market.oneWeekPriceChange || null,
-    market.oneMonthPriceChange || null,
-    market.oneYearPriceChange || null,
     
     // 状态标志
     market.active ? 1 : 0,
@@ -583,9 +530,24 @@ export async function upsertMarket(market: MarketRecord): Promise<{ inserted: bo
     market.enableOrderBook ? 1 : 0,
     market.fpmmLive ? 1 : 0,
     
+    // 交易配置
+    market.acceptingOrders !== false ? 1 : 0,
+    parseDate(market.acceptingOrdersTimestamp),
+    market.orderMinSize || 5,
+    market.orderPriceMinTickSize || 0.01,
+    market.negRisk ? 1 : 0,
+    market.negRiskMarketId || null,
+    market.negRiskRequestId || null,
+    
+    // 市场审核状态
+    market.approved ? 1 : 0,
+    market.ready ? 1 : 0,
+    market.funded ? 1 : 0,
+    market.featured ? 1 : 0,
+    market.isNew ? 1 : 0,
+    
     // 功能标志
     market.cyom ? 1 : 0,
-    market.competitive || 0,
     market.rfqEnabled ? 1 : 0,
     market.holdingRewardsEnabled ? 1 : 0,
     market.feesEnabled ? 1 : 0,
@@ -609,19 +571,33 @@ export async function upsertMarket(market: MarketRecord): Promise<{ inserted: bo
     market.tags || null,
     market.umaResolutionStatuses || null,
     
+    // UMA 预言机相关
+    market.umaBond || null,
+    market.umaReward || null,
+    market.resolvedBy || null,
+    market.resolutionSource || null,
+    market.submittedBy || null,
+    
+    // 分组/展示相关
+    market.groupItemTitle || null,
+    market.groupItemThreshold || null,
+    market.customLiveness || 0,
+    
     // 其他元数据
     market.marketMakerAddress || null,
-    market.commentCount || 0,
     market.mailchimpTag || null,
   ])
   
   const resultAny = result as any
-  // affectedRows = 1 表示新增，affectedRows = 2 表示更新
+  // INSERT IGNORE: affectedRows = 1 表示新增，= 0 表示已存在被跳过
   const inserted = resultAny.affectedRows === 1
   const id = resultAny.insertId || 0
   
   return { inserted, id }
 }
+
+// 保持向后兼容的别名
+export const upsertMarket = insertMarket
 
 /**
  * 批量保存市场数据（只插入新市场，已存在的跳过）
@@ -662,6 +638,11 @@ export async function batchUpsertMarkets(markets: MarketRecord[]): Promise<{ ins
 /**
  * 获取市场列表
  */
+/**
+ * 获取市场列表
+ * 
+ * 方案A：markets 表只存静态数据，动态数据通过 JOIN 最新的 market_price_history 获取
+ */
 export async function getMarkets(options: {
   limit?: number
   offset?: number
@@ -670,14 +651,14 @@ export async function getMarkets(options: {
   search?: string
   orderBy?: string
   orderDir?: 'ASC' | 'DESC'
-  // 高级筛选参数
+  // 高级筛选参数（基于最新价格快照）
   liquidityMin?: number
   liquidityMax?: number
   volumeMin?: number
   volumeMax?: number
   endDateMin?: string
   endDateMax?: string
-} = {}): Promise<{ markets: MarketRecord[]; total: number }> {
+} = {}): Promise<{ markets: any[]; total: number }> {
   const p = getPool()
   const {
     limit = 50,
@@ -685,7 +666,7 @@ export async function getMarkets(options: {
     active,
     category,
     search,
-    orderBy = 'updated_at',
+    orderBy = 'synced_at',
     orderDir = 'DESC',
     liquidityMin,
     liquidityMax,
@@ -695,107 +676,157 @@ export async function getMarkets(options: {
     endDateMax,
   } = options
   
+  // 构建 WHERE 子句（静态条件）
   let whereClause = '1=1'
   const params: any[] = []
   
   if (active !== undefined) {
-    whereClause += ' AND active = ?'
+    whereClause += ' AND m.active = ?'
     params.push(active ? 1 : 0)
   }
   
   if (category) {
-    whereClause += ' AND category = ?'
+    whereClause += ' AND m.category = ?'
     params.push(category)
   }
   
   if (search) {
-    whereClause += ' AND (question LIKE ? OR slug LIKE ?)'
+    whereClause += ' AND (m.question LIKE ? OR m.slug LIKE ?)'
     params.push(`%${search}%`, `%${search}%`)
   }
   
-  // 高级筛选：流动性范围
-  if (liquidityMin !== undefined && !isNaN(liquidityMin)) {
-    whereClause += ' AND liquidity >= ?'
-    params.push(liquidityMin)
-  }
-  if (liquidityMax !== undefined && !isNaN(liquidityMax)) {
-    whereClause += ' AND liquidity <= ?'
-    params.push(liquidityMax)
-  }
-  
-  // 高级筛选：交易量范围
-  if (volumeMin !== undefined && !isNaN(volumeMin)) {
-    whereClause += ' AND volume >= ?'
-    params.push(volumeMin)
-  }
-  if (volumeMax !== undefined && !isNaN(volumeMax)) {
-    whereClause += ' AND volume <= ?'
-    params.push(volumeMax)
-  }
-  
-  // 高级筛选：结束时间范围
+  // 高级筛选：结束时间范围（静态字段）
   if (endDateMin) {
-    whereClause += ' AND end_date >= ?'
+    whereClause += ' AND m.end_date >= ?'
     params.push(endDateMin)
   }
   if (endDateMax) {
-    whereClause += ' AND end_date <= ?'
+    whereClause += ' AND m.end_date <= ?'
     params.push(endDateMax)
   }
   
-  // 获取总数
-  const countSql = `SELECT COUNT(*) as total FROM markets WHERE ${whereClause}`
-  const [countResult] = await p.execute(countSql, params)
-  const total = (countResult as any)[0].total
+  // 动态字段筛选条件（HAVING 子句）
+  let havingClause = '1=1'
+  const havingParams: any[] = []
   
-  // 获取数据
-  const allowedOrderBy = ['updated_at', 'created_at', 'volume', 'volume_24hr', 'volume_1wk', 'liquidity', 'end_date', 'question', 'one_day_price_change']
-  const safeOrderBy = allowedOrderBy.includes(orderBy) ? orderBy : 'updated_at'
+  if (liquidityMin !== undefined && !isNaN(liquidityMin)) {
+    havingClause += ' AND latest_liquidity >= ?'
+    havingParams.push(liquidityMin)
+  }
+  if (liquidityMax !== undefined && !isNaN(liquidityMax)) {
+    havingClause += ' AND latest_liquidity <= ?'
+    havingParams.push(liquidityMax)
+  }
+  if (volumeMin !== undefined && !isNaN(volumeMin)) {
+    havingClause += ' AND latest_volume >= ?'
+    havingParams.push(volumeMin)
+  }
+  if (volumeMax !== undefined && !isNaN(volumeMax)) {
+    havingClause += ' AND latest_volume <= ?'
+    havingParams.push(volumeMax)
+  }
+  
+  const hasDynamicFilters = havingClause !== '1=1'
+  
+  // 子查询：获取每个市场的最新价格快照 ID
+  const latestPriceSubquery = `
+    SELECT condition_id, MAX(id) as latest_id
+    FROM market_price_history
+    GROUP BY condition_id
+  `
+  
+  // 排序字段映射
+  const orderByMapping: Record<string, string> = {
+    'synced_at': 'm.synced_at',
+    'created_at': 'm.created_at_api',
+    'end_date': 'm.end_date',
+    'question': 'm.question',
+    'volume': 'COALESCE(ph.volume, 0)',
+    'volume_24hr': 'COALESCE(ph.volume_24hr, 0)',
+    'volume_1wk': 'COALESCE(ph.volume_1wk, 0)',
+    'liquidity': 'COALESCE(ph.liquidity, 0)',
+    'one_day_price_change': 'ph.one_day_price_change',
+  }
+  const safeOrderBy = orderByMapping[orderBy] || 'm.synced_at'
   const safeOrderDir = orderDir === 'ASC' ? 'ASC' : 'DESC'
   
-  // 注意：LIMIT/OFFSET 使用 query 而不是 execute，因为 execute 对数字参数有问题
-  const sql = `
+  // 主查询：JOIN 静态数据和最新动态数据
+  const mainSql = `
     SELECT 
-      id,
-      condition_id as conditionId,
-      question_id as questionId,
-      slug,
-      question,
-      description,
-      category,
-      end_date as endDate,
-      outcomes,
-      outcome_prices as outcomePrices,
-      tokens,
-      volume,
-      volume_24hr as volume24hr,
-      volume_1wk as volume1wk,
-      liquidity,
-      best_bid as bestBid,
-      best_ask as bestAsk,
-      spread,
-      last_trade_price as lastTradePrice,
-      one_day_price_change as oneDayPriceChange,
-      one_week_price_change as oneWeekPriceChange,
-      active,
-      closed,
-      restricted,
-      enable_order_book as enableOrderBook,
-      image,
-      created_at as createdAt,
-      updated_at as updatedAt
-    FROM markets 
+      m.id,
+      m.condition_id as conditionId,
+      m.question_id as questionId,
+      m.slug,
+      m.question,
+      m.description,
+      m.category,
+      m.end_date as endDate,
+      m.outcomes,
+      m.tokens,
+      m.active,
+      m.closed,
+      m.restricted,
+      m.enable_order_book as enableOrderBook,
+      m.accepting_orders as acceptingOrders,
+      m.order_min_size as orderMinSize,
+      m.order_price_min_tick_size as orderPriceMinTickSize,
+      m.neg_risk as negRisk,
+      m.image,
+      m.synced_at as syncedAt,
+      m.created_at_api as createdAt,
+      -- 动态数据（来自最新价格快照）
+      ph.outcome_prices as outcomePrices,
+      COALESCE(ph.volume, 0) as volume,
+      COALESCE(ph.volume_24hr, 0) as volume24hr,
+      COALESCE(ph.volume_1wk, 0) as volume1wk,
+      COALESCE(ph.liquidity, 0) as liquidity,
+      ph.best_bid as bestBid,
+      ph.best_ask as bestAsk,
+      ph.spread,
+      ph.last_trade_price as lastTradePrice,
+      ph.one_day_price_change as oneDayPriceChange,
+      ph.one_week_price_change as oneWeekPriceChange,
+      ph.recorded_at as priceRecordedAt,
+      -- 用于筛选的别名
+      COALESCE(ph.liquidity, 0) as latest_liquidity,
+      COALESCE(ph.volume, 0) as latest_volume
+    FROM markets m
+    LEFT JOIN (${latestPriceSubquery}) lp ON m.condition_id = lp.condition_id
+    LEFT JOIN market_price_history ph ON lp.latest_id = ph.id
     WHERE ${whereClause}
+    ${hasDynamicFilters ? `HAVING ${havingClause}` : ''}
     ORDER BY ${safeOrderBy} ${safeOrderDir}
     LIMIT ${Number(limit)} OFFSET ${Number(offset)}
   `
   
-  const [rows] = params.length > 0 
-    ? await p.execute(sql, params)
-    : await p.query(sql)
+  // 计数查询
+  const countSql = hasDynamicFilters ? `
+    SELECT COUNT(*) as total FROM (
+      SELECT m.condition_id,
+        COALESCE(ph.liquidity, 0) as latest_liquidity,
+        COALESCE(ph.volume, 0) as latest_volume
+      FROM markets m
+      LEFT JOIN (${latestPriceSubquery}) lp ON m.condition_id = lp.condition_id
+      LEFT JOIN market_price_history ph ON lp.latest_id = ph.id
+      WHERE ${whereClause}
+      HAVING ${havingClause}
+    ) filtered
+  ` : `SELECT COUNT(*) as total FROM markets m WHERE ${whereClause}`
+  
+  // 合并参数
+  const allParams = hasDynamicFilters ? [...params, ...havingParams] : params
+  const countParams = hasDynamicFilters ? [...params, ...havingParams] : params
+  
+  // 执行查询
+  const [countResult] = await p.execute(countSql, countParams)
+  const total = (countResult as any)[0].total
+  
+  const [rows] = allParams.length > 0 
+    ? await p.execute(mainSql, allParams)
+    : await p.query(mainSql)
   
   return {
-    markets: rows as MarketRecord[],
+    markets: rows as any[],
     total
   }
 }
@@ -895,50 +926,77 @@ export async function deleteOldMarkets(options: {
 
 /**
  * 记录价格快照（用于追踪动态变化）
+ * 
+ * 方案A：存储所有动态数据，包括完整的交易量和流动性分拆
  */
-export async function recordPriceSnapshot(market: {
-  conditionId: string
-  outcomePrices: string
-  volume: number
-  volume24hr: number
-  liquidity: number
-  bestBid?: number
-  bestAsk?: number
-  spread?: number
-  lastTradePrice?: number
-}): Promise<number> {
+export async function recordPriceSnapshot(snapshot: Omit<PriceHistoryRecord, 'id' | 'recordedAt'>): Promise<number> {
   const p = getPool()
   const sql = `
     INSERT INTO market_price_history 
-    (condition_id, outcome_prices, volume, volume_24hr, liquidity, best_bid, best_ask, spread, last_trade_price)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (condition_id, outcome_prices, 
+     volume, volume_24hr, volume_1wk, volume_1mo, volume_1yr,
+     volume_1wk_amm, volume_1mo_amm, volume_1yr_amm,
+     volume_1wk_clob, volume_1mo_clob, volume_1yr_clob, volume_clob,
+     liquidity, liquidity_amm, liquidity_clob,
+     best_bid, best_ask, spread, last_trade_price,
+     one_hour_price_change, one_day_price_change, one_week_price_change, one_month_price_change, one_year_price_change,
+     competitive, comment_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
   const [result] = await p.execute(sql, [
-    market.conditionId,
-    market.outcomePrices,
-    market.volume,
-    market.volume24hr,
-    market.liquidity,
-    market.bestBid || null,
-    market.bestAsk || null,
-    market.spread || null,
-    market.lastTradePrice || null,
+    snapshot.conditionId,
+    snapshot.outcomePrices,
+    snapshot.volume || 0,
+    snapshot.volume24hr || 0,
+    snapshot.volume1wk || 0,
+    snapshot.volume1mo || 0,
+    snapshot.volume1yr || 0,
+    snapshot.volume1wkAmm || 0,
+    snapshot.volume1moAmm || 0,
+    snapshot.volume1yrAmm || 0,
+    snapshot.volume1wkClob || 0,
+    snapshot.volume1moClob || 0,
+    snapshot.volume1yrClob || 0,
+    snapshot.volumeClob || 0,
+    snapshot.liquidity || 0,
+    snapshot.liquidityAmm || 0,
+    snapshot.liquidityClob || 0,
+    snapshot.bestBid ?? null,
+    snapshot.bestAsk ?? null,
+    snapshot.spread ?? null,
+    snapshot.lastTradePrice ?? null,
+    snapshot.oneHourPriceChange ?? null,
+    snapshot.oneDayPriceChange ?? null,
+    snapshot.oneWeekPriceChange ?? null,
+    snapshot.oneMonthPriceChange ?? null,
+    snapshot.oneYearPriceChange ?? null,
+    snapshot.competitive ?? 0,
+    snapshot.commentCount ?? 0,
   ])
   return (result as any).insertId
 }
 
 /**
  * 批量记录价格快照（真正的批量 INSERT）
+ * 
+ * 方案A：存储所有动态字段，包括完整的交易量和流动性数据
  */
-export async function batchRecordPriceSnapshots(markets: MarketRecord[]): Promise<number> {
-  if (markets.length === 0) return 0
+export async function batchRecordPriceSnapshots(snapshots: Omit<PriceHistoryRecord, 'id' | 'recordedAt'>[]): Promise<number> {
+  if (snapshots.length === 0) return 0
   
   const p = getPool()
   
-  // 构建批量 INSERT 语句
-  const columns = '(condition_id, outcome_prices, volume, volume_24hr, liquidity, best_bid, best_ask, spread, last_trade_price)'
-  const valuePlaceholder = '(?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  const placeholders = markets.map(() => valuePlaceholder).join(', ')
+  // 构建批量 INSERT 语句 - 包含所有动态字段
+  const columns = `(condition_id, outcome_prices, 
+    volume, volume_24hr, volume_1wk, volume_1mo, volume_1yr,
+    volume_1wk_amm, volume_1mo_amm, volume_1yr_amm,
+    volume_1wk_clob, volume_1mo_clob, volume_1yr_clob, volume_clob,
+    liquidity, liquidity_amm, liquidity_clob,
+    best_bid, best_ask, spread, last_trade_price,
+    one_hour_price_change, one_day_price_change, one_week_price_change, one_month_price_change, one_year_price_change,
+    competitive, comment_count)`
+  const valuePlaceholder = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  const placeholders = snapshots.map(() => valuePlaceholder).join(', ')
   
   const sql = `
     INSERT INTO market_price_history ${columns}
@@ -947,17 +1005,36 @@ export async function batchRecordPriceSnapshots(markets: MarketRecord[]): Promis
   
   // 展平参数数组
   const params: any[] = []
-  for (const market of markets) {
+  for (const s of snapshots) {
     params.push(
-      market.conditionId,
-      market.outcomePrices,
-      market.volume || 0,
-      market.volume24hr || 0,
-      market.liquidity || 0,
-      market.bestBid || null,
-      market.bestAsk || null,
-      market.spread || null,
-      market.lastTradePrice || null
+      s.conditionId,
+      s.outcomePrices,
+      s.volume || 0,
+      s.volume24hr || 0,
+      s.volume1wk || 0,
+      s.volume1mo || 0,
+      s.volume1yr || 0,
+      s.volume1wkAmm || 0,
+      s.volume1moAmm || 0,
+      s.volume1yrAmm || 0,
+      s.volume1wkClob || 0,
+      s.volume1moClob || 0,
+      s.volume1yrClob || 0,
+      s.volumeClob || 0,
+      s.liquidity || 0,
+      s.liquidityAmm || 0,
+      s.liquidityClob || 0,
+      s.bestBid ?? null,
+      s.bestAsk ?? null,
+      s.spread ?? null,
+      s.lastTradePrice ?? null,
+      s.oneHourPriceChange ?? null,
+      s.oneDayPriceChange ?? null,
+      s.oneWeekPriceChange ?? null,
+      s.oneMonthPriceChange ?? null,
+      s.oneYearPriceChange ?? null,
+      s.competitive ?? 0,
+      s.commentCount ?? 0
     )
   }
   
@@ -972,6 +1049,8 @@ export async function batchRecordPriceSnapshots(markets: MarketRecord[]): Promis
 
 /**
  * 获取市场价格历史
+ * 
+ * 方案A：返回所有动态字段的完整历史记录
  */
 export async function getPriceHistory(conditionId: string, options: {
   limit?: number
@@ -997,14 +1076,31 @@ export async function getPriceHistory(conditionId: string, options: {
     SELECT 
       id,
       condition_id as conditionId,
+      -- 价格数据
       outcome_prices as outcomePrices,
-      volume,
-      volume_24hr as volume24hr,
-      liquidity,
       best_bid as bestBid,
       best_ask as bestAsk,
       spread,
       last_trade_price as lastTradePrice,
+      -- 价格变化
+      one_hour_price_change as oneHourPriceChange,
+      one_day_price_change as oneDayPriceChange,
+      one_week_price_change as oneWeekPriceChange,
+      one_month_price_change as oneMonthPriceChange,
+      one_year_price_change as oneYearPriceChange,
+      -- 交易量
+      volume,
+      volume_24hr as volume24hr,
+      volume_1wk as volume1wk,
+      volume_1mo as volume1mo,
+      volume_1yr as volume1yr,
+      -- 流动性
+      liquidity,
+      liquidity_amm as liquidityAmm,
+      liquidity_clob as liquidityClob,
+      -- 其他
+      competitive,
+      comment_count as commentCount,
       recorded_at as recordedAt
     FROM market_price_history
     WHERE ${whereClause}
