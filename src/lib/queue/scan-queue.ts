@@ -189,7 +189,18 @@ export class ScanQueue {
 
   /**
    * 执行单次扫描 - 流水线模式
-   * 每获取一页数据，立即分发给下游队列，等待处理完成后再获取下一页
+   * 
+   * 流程说明：
+   * 1. 请求 Gamma API 获取 200 条市场数据
+   * 2. 立即分发给下游队列（存储队列 + 策略队列）
+   * 3. 等待所有下游队列处理完成 (waitForQueuesIdle)
+   * 4. 请求下一页 200 条数据
+   * 5. 重复直到获取所有数据或达到 maxPages 限制
+   * 
+   * 优点：
+   * - 无需额外延迟，下游处理完即继续
+   * - 内存稳定，每次只处理 200 条
+   * - 背压控制，不会堆积任务
    */
   async scan(scanConfig?: ScanConfig): Promise<ScanTaskResult> {
     const startTime = Date.now()
@@ -267,9 +278,6 @@ export class ScanQueue {
         } else {
           offset += config.limit
           page++
-          // 添加 10 秒延迟避免限速和服务器压力
-          console.log(`⏳ [ScanQueue] 等待 10 秒后继续下一页...`)
-          await this.sleep(10000)
         }
       }
 
