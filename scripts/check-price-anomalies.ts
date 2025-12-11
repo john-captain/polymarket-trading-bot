@@ -1,5 +1,5 @@
 /**
- * 检查 market_price_history 表中 outcome_prices 价格和不等于 1 的异常数据
+ * 检查 market_price_history 表中 outcome_prices 价格和不等于 1 的
  * 
  * 用法: npx ts-node scripts/check-price-anomalies.ts [选项]
  * 

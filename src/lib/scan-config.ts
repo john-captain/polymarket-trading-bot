@@ -175,29 +175,29 @@ export function filterMarkets<T extends {
   config: ScanConfig = currentConfig
 ): T[] {
   return markets.filter(market => {
-    // 排除受限市场
-    if (config.excludeRestricted && market.restricted) {
-      return false
-    }
+    // // 排除受限市场
+    // if (config.excludeRestricted && market.restricted) {
+    //   return false
+    // }
 
-    // 仅二元市场
-    if (config.onlyBinaryMarkets) {
-      const outcomes = Array.isArray(market.outcomes) 
-        ? market.outcomes 
-        : typeof market.outcomes === 'string'
-          ? JSON.parse(market.outcomes || '[]')
-          : []
-      if (outcomes.length !== 2) {
-        return false
-      }
-    }
+    // // 仅二元市场
+    // if (config.onlyBinaryMarkets) {
+    //   const outcomes = Array.isArray(market.outcomes) 
+    //     ? market.outcomes 
+    //     : typeof market.outcomes === 'string'
+    //       ? JSON.parse(market.outcomes || '[]')
+    //       : []
+    //   if (outcomes.length !== 2) {
+    //     return false
+    //   }
+    // }
 
-    // 最小价差筛选
-    if (config.minSpread !== undefined && market.spread !== undefined) {
-      if (market.spread < config.minSpread) {
-        return false
-      }
-    }
+    // // 最小价差筛选
+    // if (config.minSpread !== undefined && market.spread !== undefined) {
+    //   if (market.spread < config.minSpread) {
+    //     return false
+    //   }
+    // }
 
     return true
   })

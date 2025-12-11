@@ -6,7 +6,7 @@
 
 import PQueue from 'p-queue'
 import { getGammaClient, generateTraceId } from '@/lib/api-client'
-import { getScanConfig, buildGammaApiParams, filterMarkets } from '@/lib/scan-config'
+import { getScanConfig, buildGammaApiParams } from '@/lib/scan-config'
 import type {
   QueueConfig,
   QueueStatus,
@@ -175,8 +175,19 @@ export class ScanQueue {
     this.eventListeners.forEach(listener => listener(event))
   }
 
+  // 等待所有下游队列处理完成的回调
+  private waitForQueuesIdle?: () => Promise<void>
+
   /**
-   * 执行单次扫描
+   * 设置等待队列空闲的回调
+   */
+  setWaitForQueuesIdle(callback: () => Promise<void>): void {
+    this.waitForQueuesIdle = callback
+  }
+
+  /**
+   * 执行单次扫描 - 流水线模式
+   * 每获取一页数据，立即分发给下游队列，等待处理完成后再获取下一页
    */
   async scan(scanConfig?: ScanConfig): Promise<ScanTaskResult> {
     const startTime = Date.now()
@@ -185,15 +196,16 @@ export class ScanQueue {
     const context = { traceId, source: 'scan-queue' }
     
     const maxMarkets = config.limit * config.maxPages
-    console.log(`🔍 [ScanQueue] 开始扫描`)
+    console.log(`🔍 [ScanQueue] 开始扫描 (流水线模式)`)
     console.log(`   配置: 每页=${config.limit}条, 最大页数=${config.maxPages}, 理论最大=${maxMarkets}个市场`)
     
     try {
       const gamma = getGammaClient()
-      const allMarkets: MarketData[] = []
+      let totalMarkets = 0
       let page = 1
       let offset = 0
       let hasMore = true
+
       while (hasMore && page <= config.maxPages) {
         // 检查背压
         if (this.checkBackpressure?.()) {
@@ -214,7 +226,7 @@ export class ScanQueue {
           await this.sleep(2000)
           const retryResponse = await gamma.getMarkets(params, context)
           if (!retryResponse.success) {
-            console.error(`❌ [ScanQueue] 重试失败，停止扫描，已获取 ${allMarkets.length} 条`)
+            console.error(`❌ [ScanQueue] 重试失败，停止扫描，已处理 ${totalMarkets} 条`)
             break
           }
           // 重试成功，使用重试结果
@@ -226,14 +238,21 @@ export class ScanQueue {
         // 转换为 MarketData
         const markets = rawMarkets.map(toMarketData)
         
-        // 应用过滤
-        const filteredMarkets = filterMarkets(markets, config)
-        
-        allMarkets.push(...filteredMarkets)
-        
         // 每 10 页输出一次进度
         if (page % 10 === 0 || rawMarkets.length < config.limit) {
-          console.log(`📊 [ScanQueue] 第 ${page}/${config.maxPages} 页: 获取 ${rawMarkets.length} 条，过滤后 ${filteredMarkets.length} 条，累计 ${allMarkets.length} 条`)
+          console.log(`📊 [ScanQueue] 第 ${page}/${config.maxPages} 页: 获取 ${rawMarkets.length} 条，累计 ${totalMarkets + markets.length} 条`)
+        }
+
+        // 🔥 立即分发本页数据给下游队列
+        if (this.onMarketsScanned && markets.length > 0) {
+          await this.onMarketsScanned(markets)
+        }
+
+        totalMarkets += markets.length
+
+        // 🔥 等待所有下游队列处理完成
+        if (this.waitForQueuesIdle) {
+          await this.waitForQueuesIdle()
         }
 
         // 检查是否还有更多
@@ -255,18 +274,13 @@ export class ScanQueue {
       this.processedCount++
       this.lastTaskAt = new Date()
 
-      // 回调处理
-      if (this.onMarketsScanned && allMarkets.length > 0) {
-        await this.onMarketsScanned(allMarkets)
-      }
-
       const result: ScanTaskResult = {
-        marketCount: allMarkets.length,
+        marketCount: totalMarkets,
         pageCount: page,
         duration,
       }
 
-      console.log(`✅ [ScanQueue] 扫描完成: ${allMarkets.length} 个市场, ${page} 页, 耗时 ${(duration / 1000).toFixed(1)}秒`)
+      console.log(`✅ [ScanQueue] 扫描完成: ${totalMarkets} 个市场, ${page} 页, 耗时 ${(duration / 1000).toFixed(1)}秒`)
       this.emitEvent('scan:complete', result)
 
       return result

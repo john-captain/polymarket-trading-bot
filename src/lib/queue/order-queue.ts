@@ -501,6 +501,13 @@ export class OrderQueue {
   }
 
   /**
+   * 等待队列空闲
+   */
+  async waitUntilIdle(): Promise<void> {
+    await this.queue.onIdle()
+  }
+
+  /**
    * 暂停队列
    */
   pause(): void {

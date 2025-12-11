@@ -559,6 +559,13 @@ export class MarketMakingQueue {
   }
 
   /**
+   * 等待队列空闲
+   */
+  async waitUntilIdle(): Promise<void> {
+    await this.queue.onIdle()
+  }
+
+  /**
    * 停止所有做市
    */
   async stopAll(): Promise<void> {

@@ -543,6 +543,13 @@ export class MintSplitQueue {
   }
 
   /**
+   * 等待队列空闲
+   */
+  async waitUntilIdle(): Promise<void> {
+    await this.queue.onIdle()
+  }
+
+  /**
    * 清理过期机会
    */
   cleanupExpired(maxAgeMs: number = 300000): number {

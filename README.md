@@ -114,6 +114,9 @@ npm run gen-creds
 
 # 检查钱包余额
 npm run check-balance
+
+# arket_price_history 表中 outcome_prices 价格和不等于 1 的数据
+npm run check-price -- --threshold=0.0001 
 ```
 
 ## 项目结构

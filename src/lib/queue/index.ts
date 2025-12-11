@@ -280,7 +280,7 @@ export function initStrategyQueueSystem() {
     await marketMakingQueue.handleTask(task)
   })
   
-  // 6. 连接扫描 → 策略分发 + 存储队列
+  // 6. 连接扫描 → 策略分发 + 存储队列 (流水线模式: 每页200条立即分发)
   scanQueue.setOnMarketsScanned(async (markets) => {
     // 存储到数据库
     await storageQueue.add(markets)
@@ -288,8 +288,22 @@ export function initStrategyQueueSystem() {
     // 分发到策略队列
     await dispatcher.analyze(markets)
   })
+
+  // 7. 设置等待队列空闲的回调 (流水线模式核心)
+  scanQueue.setWaitForQueuesIdle(async () => {
+    // 等待存储队列处理完成
+    await storageQueue.waitUntilIdle()
+    
+    // 等待策略队列处理完成
+    await mintSplitQueue.waitUntilIdle()
+    await arbitrageQueue.waitUntilIdle()
+    await marketMakingQueue.waitUntilIdle()
+    
+    // 等待订单队列处理完成
+    await orderQueue.waitUntilIdle()
+  })
   
-  console.log('✅ [QueueSystem] 策略队列系统已初始化（存储队列已启用）')
+  console.log('✅ [QueueSystem] 策略队列系统已初始化（流水线模式）')
   
   return {
     scanQueue,

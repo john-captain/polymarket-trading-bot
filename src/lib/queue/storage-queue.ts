@@ -388,6 +388,18 @@ export class StorageQueue {
   }
 
   /**
+   * 等待队列空闲 (缓冲区清空 + 任务完成)
+   */
+  async waitUntilIdle(): Promise<void> {
+    // 先刷新缓冲区
+    if (this.buffer.length > 0) {
+      await this.flush()
+    }
+    // 等待队列空闲
+    await this.queue.onIdle()
+  }
+
+  /**
    * 检查缓冲区是否已满
    */
   isBufferFull(): boolean {
