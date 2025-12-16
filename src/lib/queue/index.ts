@@ -55,6 +55,18 @@ export {
   type StorageTaskResult,
 } from './storage-queue'
 
+// ==================== 价格队列 ====================
+
+export {
+  PriceQueue,
+  getPriceQueue,
+  resetPriceQueue,
+  type PriceQueueConfig,
+  type PriceTaskResult,
+  type PriceQueueStatus,
+  DEFAULT_PRICE_CONFIG,
+} from './price-queue'
+
 // ==================== 策略分发器 ====================
 
 export {

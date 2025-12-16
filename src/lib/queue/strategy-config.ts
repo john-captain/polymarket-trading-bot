@@ -44,7 +44,9 @@ export interface MintSplitConfig {
 }
 
 /**
- * Arbitrage 策略配置 (LONG + SHORT)
+ * Arbitrage 策略配置 (仅 LONG)
+ * 
+ * SHORT 策略已移除，功能与 MintSplit 策略重复
  */
 export interface ArbitrageConfig {
   /** 是否启用 */
@@ -59,17 +61,6 @@ export interface ArbitrageConfig {
     maxPriceSum: number
     /** 最小价差 (%) */
     minSpread: number
-  }
-  
-  // SHORT 子策略 (卖出总价 > 1)
-  short: {
-    enabled: boolean
-    /** 最小卖出价格和 (触发条件：价格和 > 此值) */
-    minPriceSum: number
-    /** 最小价差 (%) */
-    minSpread: number
-    /** 是否允许铸造后卖出 */
-    allowMint: boolean
   }
   
   // 交易参数
@@ -90,7 +81,15 @@ export interface ArbitrageConfig {
 }
 
 /**
- * Market-Making 策略配置
+ * Market-Making 做市策略配置
+ * 
+ * 适合小额做市的 6 个关键条件：
+ * ① 成交活跃 - 每分钟 5+ 次成交
+ * ② spread ≥ 1.5% - 覆盖手续费与利润
+ * ③ 波动不剧烈 - 价格在区间震荡
+ * ④ 深度足够厚 - 不会因小单推动价格
+ * ⑤ 手续费可控 - 每单至少 $0.5～$1
+ * ⑥ 无专业机器人垄断 - 否则永远插不进去
  */
 export interface MarketMakingConfig {
   /** 是否启用 */
@@ -98,31 +97,75 @@ export interface MarketMakingConfig {
   /** 是否自动执行 */
   autoExecute: boolean
   
-  // 做市参数
-  /** 买卖价差 (%) */
+  // ========== 做市参数 ==========
+  /** 买卖价差 (%) - 你挂单的 spread */
   spreadPercent: number
+  /** 单笔订单大小 ($) - 建议 ≥ $0.5 覆盖手续费 */
+  orderSize: number
   /** 单边最大持仓 ($) */
   maxPositionPerSide: number
   /** 订单刷新间隔 (ms) */
   refreshIntervalMs: number
   
-  // 市场筛选
+  // ========== ① 成交活跃度筛选 (最重要) ==========
+  /** 最小24h交易量 ($) - 建议 ≥ $5000 */
+  minVolume24h: number
+  /** 最小每分钟成交次数 - 建议 ≥ 5 */
+  minTradesPerMinute: number
+  /** 最近成交时间阈值 (秒) - 超过此时间无成交则跳过 */
+  maxLastTradeAge: number
+  
+  // ========== ② Spread 筛选 ==========
+  /** 最小市场自然价差 (%) - 建议 ≥ 1.5% */
+  minMarketSpread: number
+  /** 最大市场价差 (%) - 价差太大可能流动性差 */
+  maxMarketSpread: number
+  
+  // ========== ③ 波动率筛选 ==========
+  /** 最大价格波动率 (%) - 24h内价格变动幅度 */
+  maxVolatility: number
+  /** 价格稳定区间 - YES价格应在此范围内 (如 0.35-0.65) */
+  priceRangeMin: number
+  priceRangeMax: number
+  /** 最小剩余天数 - 避免临近结算的市场 */
+  minDaysUntilEnd: number
+  
+  // ========== ④ 深度筛选 ==========
   /** 最小流动性 ($) */
   minLiquidity: number
-  /** 最小24h交易量 ($) */
-  minVolume24h: number
+  /** 最小订单簿深度 (条数) - bid/ask 各至少多少条 */
+  minOrderBookDepth: number
+  /** 最小深度金额 ($) - 订单簿前 N 档总金额 */
+  minDepthAmount: number
   
-  // 风控
-  /** 库存偏斜阈值 (触发调整) */
+  // ========== ⑤ 手续费控制 ==========
+  /** 最小单笔订单 ($) - 太小会被手续费吃掉 */
+  minOrderSize: number
+  /** 预估手续费率 (%) */
+  estimatedFeeRate: number
+  
+  // ========== ⑥ 竞争检测 ==========
+  /** 是否启用竞争检测 */
+  enableCompetitionDetection: boolean
+  /** 最大订单刷新频率 (次/秒) - 超过说明有高频机器人 */
+  maxOrderRefreshRate: number
+  /** 最大连续被插队次数 - 超过则放弃该市场 */
+  maxFrontRunCount: number
+  
+  // ========== 风控 ==========
+  /** 库存偏斜阈值 (%) - 单边持仓超过此比例触发调整 */
   skewThreshold: number
   /** 最大未平仓持仓 ($) */
   maxOpenPosition: number
   /** 是否自动 Merge 赎回 */
   autoMerge: boolean
-  /** Merge 触发阈值 (双边持仓时) */
+  /** Merge 触发阈值 ($) - 双边持仓都超过此值时触发 */
   mergeThreshold: number
+  /** 单日最大亏损 ($) - 达到后暂停该市场 */
+  maxDailyLoss: number
   
-  // 冷却
+  // ========== 冷却 ==========
+  /** 冷却时间 (ms) */
   cooldownMs: number
 }
 
@@ -172,12 +215,6 @@ export const DEFAULT_ARBITRAGE_CONFIG: ArbitrageConfig = {
     maxPriceSum: 0.995,
     minSpread: 0.5,
   },
-  short: {
-    enabled: false, // 默认关闭，需要持仓或铸造
-    minPriceSum: 1.005,
-    minSpread: 0.5,
-    allowMint: false,
-  },
   tradeAmount: 10,
   maxSlippage: 0.5,
   cooldownMs: 60000,
@@ -189,16 +226,51 @@ export const DEFAULT_ARBITRAGE_CONFIG: ArbitrageConfig = {
 export const DEFAULT_MARKET_MAKING_CONFIG: MarketMakingConfig = {
   enabled: false, // 默认关闭，风险较高
   autoExecute: false,
-  spreadPercent: 2,
-  maxPositionPerSide: 100,
-  refreshIntervalMs: 30000,
-  minLiquidity: 1000,
-  minVolume24h: 5000,
-  skewThreshold: 0.3,
-  maxOpenPosition: 500,
-  autoMerge: true,
-  mergeThreshold: 50,
-  cooldownMs: 30000,
+  
+  // 做市参数
+  spreadPercent: 2,           // 挂单价差 2%
+  orderSize: 1,               // 每单 $1
+  maxPositionPerSide: 50,     // 单边最大持仓 $50
+  refreshIntervalMs: 30000,   // 30秒刷新一次订单
+  
+  // ① 成交活跃度 (最重要)
+  minVolume24h: 5000,         // 24h交易量 ≥ $5000
+  minTradesPerMinute: 5,      // 每分钟 ≥ 5 笔成交
+  maxLastTradeAge: 300,       // 最近成交不超过 5 分钟前
+  
+  // ② Spread 筛选
+  minMarketSpread: 1.5,       // 市场自然价差 ≥ 1.5%
+  maxMarketSpread: 10,        // 价差不超过 10% (太大说明流动性差)
+  
+  // ③ 波动率筛选
+  maxVolatility: 15,          // 24h波动率 ≤ 15%
+  priceRangeMin: 0.35,        // YES价格下限 35%
+  priceRangeMax: 0.65,        // YES价格上限 65%
+  minDaysUntilEnd: 10,        // 至少还有 10 天结束
+  
+  // ④ 深度筛选
+  minLiquidity: 1000,         // 最小流动性 $1000
+  minOrderBookDepth: 20,      // 订单簿至少 20 档
+  minDepthAmount: 100,        // 前几档深度 ≥ $100
+  
+  // ⑤ 手续费控制
+  minOrderSize: 0.5,          // 最小单笔 $0.5
+  estimatedFeeRate: 0.2,      // 预估手续费 0.2%
+  
+  // ⑥ 竞争检测
+  enableCompetitionDetection: true,
+  maxOrderRefreshRate: 2,     // 订单刷新 ≤ 2次/秒 (否则有高频机器人)
+  maxFrontRunCount: 5,        // 被插队超过 5 次则放弃
+  
+  // 风控
+  skewThreshold: 0.6,         // 单边持仓超过 60% 触发调整
+  maxOpenPosition: 100,       // 最大未平仓 $100
+  autoMerge: true,            // 自动 Merge 赎回
+  mergeThreshold: 20,         // 双边持仓都超过 $20 时触发 Merge
+  maxDailyLoss: 10,           // 单日最大亏损 $10
+  
+  // 冷却
+  cooldownMs: 30000,          // 30秒冷却
 }
 
 export const DEFAULT_STRATEGY_CONFIG: AllStrategyConfig = {

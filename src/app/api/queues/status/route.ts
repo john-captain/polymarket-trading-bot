@@ -4,11 +4,13 @@
  */
 
 import { NextResponse } from "next/server"
-import { getQueueSystemStatus } from "@/lib/queue"
+import { getQueueSystemStatus, getPriceQueue } from "@/lib/queue"
 
 export async function GET() {
   try {
     const status = getQueueSystemStatus()
+    const priceQueue = getPriceQueue()
+    const priceStatus = priceQueue.getStatus()
     
     return NextResponse.json({
       success: true,
@@ -29,6 +31,15 @@ export async function GET() {
           completed: status.storage.completed,
           failed: status.storage.failed,
           stats: status.storageStats,
+        },
+        price: {
+          size: priceStatus.size,
+          pending: priceStatus.pending,
+          state: priceStatus.state,
+          processedCount: priceStatus.processedCount,
+          errorCount: priceStatus.errorCount,
+          lastTaskAt: priceStatus.lastTaskAt,
+          stats: priceStatus.stats,
         },
         strategies: {
           mintSplit: status.strategies.mintSplit,

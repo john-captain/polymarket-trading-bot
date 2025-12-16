@@ -506,64 +506,6 @@ function ArbitrageConfigCard({
           )}
         </div>
         
-        {/* SHORT 子策略 */}
-        <div className="border rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium">SHORT (做空)</h4>
-            <Switch
-              checked={localConfig.short.enabled}
-              onCheckedChange={(enabled) => 
-                setLocalConfig(prev => ({ ...prev, short: { ...prev.short, enabled } }))
-              }
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>最小价格和</Label>
-              <Input
-                type="number"
-                step="0.001"
-                value={localConfig.short.minPriceSum}
-                onChange={(e) => 
-                  setLocalConfig(prev => ({ 
-                    ...prev, 
-                    short: { ...prev.short, minPriceSum: parseFloat(e.target.value) } 
-                  }))
-                }
-              />
-              <p className="text-xs text-muted-foreground">价格和 {`>`} 此值时触发</p>
-            </div>
-            <div className="space-y-2">
-              <Label>最小价差 (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={localConfig.short.minSpread}
-                onChange={(e) => 
-                  setLocalConfig(prev => ({ 
-                    ...prev, 
-                    short: { ...prev.short, minSpread: parseFloat(e.target.value) } 
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>允许铸造</Label>
-              <Switch
-                checked={localConfig.short.allowMint}
-                onCheckedChange={(allowMint) => 
-                  setLocalConfig(prev => ({ ...prev, short: { ...prev.short, allowMint } }))
-                }
-              />
-            </div>
-          </div>
-          {status?.short?.today && (
-            <div className="mt-2 text-sm text-muted-foreground">
-              今日: {status.short.today.found} 发现 / {status.short.today.success} 成功
-            </div>
-          )}
-        </div>
-        
         {/* 通用参数 */}
         <div>
           <h4 className="font-medium mb-3">通用参数</h4>

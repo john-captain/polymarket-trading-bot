@@ -2,7 +2,7 @@
 
 /**
  * Arbitrage 策略配置页面
- * 套利策略 - LONG: 买价和 < $1 时买入 | SHORT: 卖价和 > $1 时卖出
+ * 套利策略 - LONG: 买价和 < $1 时买入所有结果，等待市场校正后获利
  */
 
 import { useState } from "react"
@@ -17,7 +17,6 @@ import { Header } from "@/components/layout/header"
 import { useToast } from "@/hooks/use-toast"
 import { 
   TrendingUp, 
-  TrendingDown,
   Shield, 
   Zap, 
   DollarSign,
@@ -25,7 +24,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   ArrowUpCircle,
-  ArrowDownCircle,
   BookOpen,
   Calculator,
   ArrowRight,
@@ -127,12 +125,12 @@ export default function ArbitrageConfigPage() {
     <div className="flex flex-col">
       <Header 
         title="Arbitrage 策略配置" 
-        description="套利策略 - LONG/SHORT 双向套利"
+        description="LONG 套利策略 - 买价和 < $1 时买入所有结果"
       />
       
       <div className="flex-1 space-y-6 p-6">
         {/* 状态概览 */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -160,19 +158,6 @@ export default function ArbitrageConfigPage() {
                   </p>
                 </div>
                 <ArrowUpCircle className="h-8 w-8 text-green-500/50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">SHORT 今日</p>
-                  <p className="text-xl font-bold">
-                    {arbStatus?.short?.today?.success || 0}/{arbStatus?.short?.today?.found || 0}
-                  </p>
-                </div>
-                <ArrowDownCircle className="h-8 w-8 text-red-500/50" />
               </div>
             </CardContent>
           </Card>
@@ -239,21 +224,6 @@ function ArbitrageConfigForm({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <div className="flex items-center gap-3">
-              <Zap className="h-5 w-5 text-amber-600" />
-              <div>
-                <p className="font-medium text-amber-800">自动执行</p>
-                <p className="text-sm text-amber-600">检测到机会时自动执行交易</p>
-              </div>
-            </div>
-            <Switch
-              checked={localConfig.autoExecute}
-              onCheckedChange={(autoExecute) => setLocalConfig(prev => ({ ...prev, autoExecute }))}
-            />
-          </div>
-        </CardContent>
       </Card>
 
       {/* LONG 子策略 */}
@@ -322,86 +292,6 @@ function ArbitrageConfigForm({
         </CardContent>
       </Card>
 
-      {/* SHORT 子策略 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <ArrowDownCircle className="h-5 w-5 text-red-600" />
-              </div>
-              <div>
-                <CardTitle>SHORT 做空策略</CardTitle>
-                <CardDescription>当卖价总和 &gt; $1 时，卖出（或铸造后卖出）所有结果</CardDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={localConfig.short.enabled ? "default" : "secondary"}>
-                {localConfig.short.enabled ? "已启用" : "已禁用"}
-              </Badge>
-              <Switch
-                checked={localConfig.short.enabled}
-                onCheckedChange={(enabled) => 
-                  setLocalConfig(prev => ({ ...prev, short: { ...prev.short, enabled } }))
-                }
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <Label>最小价格和</Label>
-              <Input
-                type="number"
-                step="0.001"
-                value={localConfig.short.minPriceSum}
-                onChange={(e) => 
-                  setLocalConfig(prev => ({ 
-                    ...prev, 
-                    short: { ...prev.short, minPriceSum: parseFloat(e.target.value) } 
-                  }))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                卖价和 &gt; 此值时触发（推荐 1.01）
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>最小价差 (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={localConfig.short.minSpread}
-                onChange={(e) => 
-                  setLocalConfig(prev => ({ 
-                    ...prev, 
-                    short: { ...prev.short, minSpread: parseFloat(e.target.value) } 
-                  }))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                预期收益率低于此值时跳过
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>允许铸造</Label>
-              <div className="flex items-center gap-2 pt-2">
-                <Switch
-                  checked={localConfig.short.allowMint}
-                  onCheckedChange={(allowMint) => 
-                    setLocalConfig(prev => ({ ...prev, short: { ...prev.short, allowMint } }))
-                  }
-                />
-                <span className="text-sm text-muted-foreground">
-                  {localConfig.short.allowMint ? "可铸造后卖出" : "仅卖出已有持仓"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* 通用参数 */}
       <Card>
         <CardHeader>
@@ -411,7 +301,7 @@ function ArbitrageConfigForm({
             </div>
             <div>
               <CardTitle>通用参数</CardTitle>
-              <CardDescription>LONG 和 SHORT 共享的交易参数</CardDescription>
+              <CardDescription>LONG 策略的交易参数</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -600,89 +490,6 @@ function ArbitrageConfigForm({
               </div>
             </div>
           </div>
-
-          {/* SHORT 做空详解 */}
-          <div className="space-y-3">
-            <h4 className="font-semibold flex items-center gap-2">
-              <ArrowDownCircle className="h-4 w-4 text-red-500" />
-              SHORT 做空策略
-            </h4>
-            <div className="grid gap-3">
-              <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                <Badge variant="outline" className="mt-0.5 bg-red-100 text-red-700 border-red-300">触发</Badge>
-                <div className="text-sm">
-                  <p className="font-medium text-red-800">价格和 &gt; 1 时触发</p>
-                  <p className="text-xs text-red-700 mt-1">
-                    例：三元市场 A=$0.35 + B=$0.38 + C=$0.32 = $1.05
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Badge variant="outline" className="mt-0.5">操作</Badge>
-                <div className="text-sm">
-                  <p className="font-medium">卖出所有结果各 N 份</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    如果没有持仓，先铸造 N 套（成本 $N），然后分别卖出
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                <Badge variant="outline" className="mt-0.5 bg-red-100 text-red-700 border-red-300">利润</Badge>
-                <div className="text-sm">
-                  <p className="font-medium text-red-800">利润 = N × (价格和 - 1)</p>
-                  <p className="text-xs text-red-700 mt-1">
-                    示例：铸造 $100 → 卖出 $105 → 净赚 $5 (5%)，即时到账
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* LONG vs SHORT 对比 */}
-          <div className="space-y-3">
-            <h4 className="font-semibold flex items-center gap-2">
-              <Info className="h-4 w-4 text-cyan-500" />
-              LONG vs SHORT 策略对比
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium">特性</th>
-                    <th className="text-left py-2 font-medium text-green-600">LONG 做多</th>
-                    <th className="text-left py-2 font-medium text-red-600">SHORT 做空</th>
-                  </tr>
-                </thead>
-                <tbody className="text-muted-foreground">
-                  <tr className="border-b">
-                    <td className="py-2">触发条件</td>
-                    <td className="py-2">价格和 &lt; 1</td>
-                    <td className="py-2">价格和 &gt; 1</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2">资金锁定</td>
-                    <td className="py-2 text-amber-600">需等待结算</td>
-                    <td className="py-2 text-green-600">即时获利</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2">利润计算</td>
-                    <td className="py-2">A × (1-S) / S</td>
-                    <td className="py-2">A × (S-1)</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2">需要铸造</td>
-                    <td className="py-2">不需要</td>
-                    <td className="py-2">可能需要</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2">机会频率</td>
-                    <td className="py-2">较少</td>
-                    <td className="py-2">较多（等同 Mint-Split）</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
@@ -697,7 +504,7 @@ function ArbitrageConfigForm({
         <CardContent className="text-sm space-y-3">
           <div className="grid gap-3">
             <div className="flex items-start gap-2">
-              <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 shrink-0">LONG 特有</Badge>
+              <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 shrink-0">资金锁定</Badge>
               <p className="text-muted-foreground">
                 <strong>资金锁定风险：</strong>LONG 策略需要等待市场结算才能获利，资金可能被锁定数天甚至数月
               </p>
@@ -705,7 +512,7 @@ function ArbitrageConfigForm({
             <div className="flex items-start gap-2">
               <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 shrink-0">执行风险</Badge>
               <p className="text-muted-foreground">
-                需要同时买入/卖出所有结果，时间差可能导致部分订单失败或价格变动
+                需要同时买入所有结果，时间差可能导致部分订单失败或价格变动
               </p>
             </div>
             <div className="flex items-start gap-2">
@@ -717,12 +524,12 @@ function ArbitrageConfigForm({
             <div className="flex items-start gap-2">
               <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 shrink-0">竞争风险</Badge>
               <p className="text-muted-foreground">
-                套利机会稍纵即逝，其他机器人可能更快完成交易
+                套利机会稀缺且稍纵即逝，其他机器人可能更快完成交易
               </p>
             </div>
           </div>
           <p className="text-amber-700 font-medium mt-4">
-            💡 建议：优先使用 SHORT 策略（即时获利），LONG 策略仅在高确信度时使用
+            💡 建议：如需即时获利的套利策略，请使用「铸造拆分」策略
           </p>
         </CardContent>
       </Card>

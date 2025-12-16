@@ -39,22 +39,54 @@ import {
   BarChart2,
 } from "lucide-react"
 
-// Market-Making 配置类型
+// Market-Making 配置类型 - 包含 6 个关键筛选条件
 interface MarketMakingConfig {
   enabled: boolean
   autoExecute: boolean
+  
+  // 做市参数
   spreadPercent: number
   orderSize: number
   maxPositionPerSide: number
-  totalCapital: number
   refreshIntervalMs: number
-  minLiquidity: number
+  
+  // ① 成交活跃度 (最重要)
   minVolume24h: number
+  minTradesPerMinute: number
+  maxLastTradeAge: number
+  
+  // ② Spread 筛选
+  minMarketSpread: number
+  maxMarketSpread: number
+  
+  // ③ 波动率筛选
+  maxVolatility: number
+  priceRangeMin: number
+  priceRangeMax: number
+  minDaysUntilEnd: number
+  
+  // ④ 深度筛选
+  minLiquidity: number
+  minOrderBookDepth: number
+  minDepthAmount: number
+  
+  // ⑤ 手续费控制
+  minOrderSize: number
+  estimatedFeeRate: number
+  
+  // ⑥ 竞争检测
+  enableCompetitionDetection: boolean
+  maxOrderRefreshRate: number
+  maxFrontRunCount: number
+  
+  // 风控
   skewThreshold: number
   maxOpenPosition: number
-  autoHedge: boolean
   autoMerge: boolean
   mergeThreshold: number
+  maxDailyLoss: number
+  
+  // 冷却
   cooldownMs: number
 }
 
@@ -240,8 +272,8 @@ function MarketMakingConfigForm({
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Badge variant={config.enabled ? "destructive" : "secondary"}>
-                {config.enabled ? "风险较高" : "已关闭"}
+              <Badge variant={localConfig.enabled ? "destructive" : "secondary"}>
+                {localConfig.enabled ? "风险较高" : "已关闭"}
               </Badge>
               <Switch
                 checked={localConfig.enabled}
@@ -250,21 +282,6 @@ function MarketMakingConfigForm({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <div className="flex items-center gap-3">
-              <Zap className="h-5 w-5 text-amber-600" />
-              <div>
-                <p className="font-medium text-amber-800">自动执行</p>
-                <p className="text-sm text-amber-600">检测到机会时自动执行交易</p>
-              </div>
-            </div>
-            <Switch
-              checked={localConfig.autoExecute}
-              onCheckedChange={(autoExecute) => setLocalConfig(prev => ({ ...prev, autoExecute }))}
-            />
-          </div>
-        </CardContent>
       </Card>
 
       {/* 做市参数 */}
@@ -281,7 +298,7 @@ function MarketMakingConfigForm({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-2">
               <Label className="flex items-center gap-1">
                 <Percent className="h-3.5 w-3.5" />
@@ -294,35 +311,22 @@ function MarketMakingConfigForm({
                 onChange={(e) => setLocalConfig(prev => ({ ...prev, spreadPercent: parseFloat(e.target.value) }))}
               />
               <p className="text-xs text-muted-foreground">
-                买单和卖单之间的价差，2% = 买 $0.49 卖 $0.51
+                你的挂单价差，建议 ≥ 2%
               </p>
             </div>
             <div className="space-y-2">
               <Label className="flex items-center gap-1">
-                <BarChart2 className="h-3.5 w-3.5" />
+                <DollarSign className="h-3.5 w-3.5" />
                 单笔订单量 ($)
               </Label>
               <Input
                 type="number"
-                value={localConfig.orderSize || 10}
-                onChange={(e) => setLocalConfig(prev => ({ ...prev, orderSize: parseInt(e.target.value) }))}
+                step="0.5"
+                value={localConfig.orderSize}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, orderSize: parseFloat(e.target.value) }))}
               />
               <p className="text-xs text-muted-foreground">
-                每个买单/卖单的金额
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1">
-                <Wallet className="h-3.5 w-3.5" />
-                总资金 ($)
-              </Label>
-              <Input
-                type="number"
-                value={localConfig.totalCapital || 500}
-                onChange={(e) => setLocalConfig(prev => ({ ...prev, totalCapital: parseInt(e.target.value) }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                分配给做市策略的总资金
+                每笔订单金额，建议 ≥ $1
               </p>
             </div>
             <div className="space-y-2">
@@ -336,7 +340,7 @@ function MarketMakingConfigForm({
                 onChange={(e) => setLocalConfig(prev => ({ ...prev, maxPositionPerSide: parseInt(e.target.value) }))}
               />
               <p className="text-xs text-muted-foreground">
-                单边（买/卖）最大持仓金额
+                单边最大持仓金额
               </p>
             </div>
             <div className="space-y-2">
@@ -347,50 +351,31 @@ function MarketMakingConfigForm({
                 onChange={(e) => setLocalConfig(prev => ({ ...prev, refreshIntervalMs: parseInt(e.target.value) * 1000 }))}
               />
               <p className="text-xs text-muted-foreground">
-                订单刷新/重新挂单的间隔
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>冷却时间 (秒)</Label>
-              <Input
-                type="number"
-                value={localConfig.cooldownMs / 1000}
-                onChange={(e) => setLocalConfig(prev => ({ ...prev, cooldownMs: parseInt(e.target.value) * 1000 }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                成交后的冷却等待时间
+                订单刷新间隔
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 市场筛选 */}
-      <Card>
+      {/* ① 成交活跃度筛选 (最重要) */}
+      <Card className="border-green-200">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-100 rounded-lg">
-              <Target className="h-5 w-5 text-green-600" />
+              <Activity className="h-5 w-5 text-green-600" />
             </div>
             <div>
-              <CardTitle>市场筛选</CardTitle>
-              <CardDescription>选择适合做市的目标市场</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                ① 成交活跃度筛选
+                <Badge variant="default" className="bg-green-600">最重要</Badge>
+              </CardTitle>
+              <CardDescription>活跃市场是做市策略的生命线</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>最小流动性 ($)</Label>
-              <Input
-                type="number"
-                value={localConfig.minLiquidity}
-                onChange={(e) => setLocalConfig(prev => ({ ...prev, minLiquidity: parseInt(e.target.value) }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                市场流动性低于此值时不做市
-              </p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
               <Label>最小 24h 交易量 ($)</Label>
               <Input
@@ -399,7 +384,289 @@ function MarketMakingConfigForm({
                 onChange={(e) => setLocalConfig(prev => ({ ...prev, minVolume24h: parseInt(e.target.value) }))}
               />
               <p className="text-xs text-muted-foreground">
-                日交易量低于此值时不做市
+                建议 ≥ $5000，越高越好
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>最小每分钟成交次数</Label>
+              <Input
+                type="number"
+                value={localConfig.minTradesPerMinute}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, minTradesPerMinute: parseInt(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                建议 ≥ 5 次/分钟
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>最近成交时间阈值 (秒)</Label>
+              <Input
+                type="number"
+                value={localConfig.maxLastTradeAge}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, maxLastTradeAge: parseInt(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                超过此时间无成交则跳过
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ② Spread 筛选 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <ArrowLeftRight className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <CardTitle>② Spread 价差筛选</CardTitle>
+              <CardDescription>价差必须能覆盖手续费和利润</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label>最小市场价差 (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={localConfig.minMarketSpread}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, minMarketSpread: parseFloat(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                市场自然价差需 ≥ 1.5% 才能盈利
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>最大市场价差 (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={localConfig.maxMarketSpread}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, maxMarketSpread: parseFloat(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                价差太大说明流动性差
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ③ 波动率筛选 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <BarChart2 className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <CardTitle>③ 波动率筛选</CardTitle>
+              <CardDescription>避免价格剧烈波动导致库存风险</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <Label>最大波动率 (%)</Label>
+              <Input
+                type="number"
+                step="1"
+                value={localConfig.maxVolatility}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, maxVolatility: parseFloat(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                24h价格变动幅度上限
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>价格下限 (%)</Label>
+              <Input
+                type="number"
+                step="0.05"
+                value={localConfig.priceRangeMin}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, priceRangeMin: parseFloat(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                YES价格需 ≥ 此值
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>价格上限 (%)</Label>
+              <Input
+                type="number"
+                step="0.05"
+                value={localConfig.priceRangeMax}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, priceRangeMax: parseFloat(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                YES价格需 ≤ 此值
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>最小剩余天数</Label>
+              <Input
+                type="number"
+                value={localConfig.minDaysUntilEnd}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, minDaysUntilEnd: parseInt(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                避免临近结算的市场
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ④ 深度筛选 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Layers className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <CardTitle>④ 深度筛选</CardTitle>
+              <CardDescription>确保小额订单不会推动价格</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <Label>最小流动性 ($)</Label>
+              <Input
+                type="number"
+                value={localConfig.minLiquidity}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, minLiquidity: parseInt(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                市场总流动性下限
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>最小订单簿深度 (档)</Label>
+              <Input
+                type="number"
+                value={localConfig.minOrderBookDepth}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, minOrderBookDepth: parseInt(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                bid/ask各至少多少档
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>最小深度金额 ($)</Label>
+              <Input
+                type="number"
+                value={localConfig.minDepthAmount}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, minDepthAmount: parseInt(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                前几档总金额下限
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ⑤ 手续费控制 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyan-100 rounded-lg">
+              <Calculator className="h-5 w-5 text-cyan-600" />
+            </div>
+            <div>
+              <CardTitle>⑤ 手续费控制</CardTitle>
+              <CardDescription>确保每单利润能覆盖手续费</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label>最小单笔订单 ($)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={localConfig.minOrderSize}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, minOrderSize: parseFloat(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                太小会被手续费吃掉，建议 ≥ $0.5
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>预估手续费率 (%)</Label>
+              <Input
+                type="number"
+                step="0.05"
+                value={localConfig.estimatedFeeRate}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, estimatedFeeRate: parseFloat(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                用于计算最小盈利要求
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ⑥ 竞争检测 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-rose-100 rounded-lg">
+              <Zap className="h-5 w-5 text-rose-600" />
+            </div>
+            <div>
+              <CardTitle>⑥ 竞争检测</CardTitle>
+              <CardDescription>避免与专业高频做市机器人竞争</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <Label>启用竞争检测</Label>
+              <div className="flex items-center gap-2 pt-2">
+                <Switch
+                  checked={localConfig.enableCompetitionDetection}
+                  onCheckedChange={(v) => setLocalConfig(prev => ({ ...prev, enableCompetitionDetection: v }))}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {localConfig.enableCompetitionDetection ? "已启用" : "已禁用"}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>最大订单刷新频率 (次/秒)</Label>
+              <Input
+                type="number"
+                step="0.5"
+                value={localConfig.maxOrderRefreshRate}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, maxOrderRefreshRate: parseFloat(e.target.value) }))}
+                disabled={!localConfig.enableCompetitionDetection}
+              />
+              <p className="text-xs text-muted-foreground">
+                超过说明有高频机器人
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>最大被插队次数</Label>
+              <Input
+                type="number"
+                value={localConfig.maxFrontRunCount}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, maxFrontRunCount: parseInt(e.target.value) }))}
+                disabled={!localConfig.enableCompetitionDetection}
+              />
+              <p className="text-xs text-muted-foreground">
+                超过则放弃该市场
               </p>
             </div>
           </div>
@@ -420,17 +687,17 @@ function MarketMakingConfigForm({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <Label>库存偏斜阈值</Label>
+              <Label>库存偏斜阈值 (%)</Label>
               <Input
                 type="number"
                 step="0.1"
-                value={localConfig.skewThreshold}
-                onChange={(e) => setLocalConfig(prev => ({ ...prev, skewThreshold: parseFloat(e.target.value) }))}
+                value={localConfig.skewThreshold * 100}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, skewThreshold: parseFloat(e.target.value) / 100 }))}
               />
               <p className="text-xs text-muted-foreground">
-                超过此偏斜度时调整报价
+                单边持仓超过此比例触发调整
               </p>
             </div>
             <div className="space-y-2">
@@ -441,22 +708,18 @@ function MarketMakingConfigForm({
                 onChange={(e) => setLocalConfig(prev => ({ ...prev, maxOpenPosition: parseInt(e.target.value) }))}
               />
               <p className="text-xs text-muted-foreground">
-                所有市场的未平仓持仓上限
+                所有市场的持仓上限
               </p>
             </div>
             <div className="space-y-2">
-              <Label>自动对冲</Label>
-              <div className="flex items-center gap-2 pt-2">
-                <Switch
-                  checked={localConfig.autoHedge}
-                  onCheckedChange={(autoHedge) => setLocalConfig(prev => ({ ...prev, autoHedge }))}
-                />
-                <span className="text-sm text-muted-foreground">
-                  {localConfig.autoHedge ? "已启用" : "已禁用"}
-                </span>
-              </div>
+              <Label>单日最大亏损 ($)</Label>
+              <Input
+                type="number"
+                value={localConfig.maxDailyLoss}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, maxDailyLoss: parseInt(e.target.value) }))}
+              />
               <p className="text-xs text-muted-foreground">
-                库存偏斜时自动调整报价
+                达到后暂停该市场
               </p>
             </div>
             <div className="space-y-2">
@@ -470,9 +733,6 @@ function MarketMakingConfigForm({
                   {localConfig.autoMerge ? "已启用" : "已禁用"}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                持有完整组合时自动赎回
-              </p>
             </div>
             <div className="space-y-2">
               <Label>Merge 阈值 ($)</Label>
@@ -483,153 +743,43 @@ function MarketMakingConfigForm({
                 disabled={!localConfig.autoMerge}
               />
               <p className="text-xs text-muted-foreground">
-                完整组合价值超过此值时 Merge
+                双边持仓都超过此值时触发
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>冷却时间 (秒)</Label>
+              <Input
+                type="number"
+                value={localConfig.cooldownMs / 1000}
+                onChange={(e) => setLocalConfig(prev => ({ ...prev, cooldownMs: parseInt(e.target.value) * 1000 }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                成交后冷却等待
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 策略原理详解 */}
-      <Card>
+      {/* 小额做市提示 */}
+      <Card className="border-blue-200 bg-blue-50/50">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <BookOpen className="h-5 w-5 text-indigo-600" />
-            </div>
-            <div>
-              <CardTitle>策略原理详解</CardTitle>
-              <CardDescription>理解做市策略的核心逻辑 - 动态对冲，赚取流动性价差</CardDescription>
-            </div>
+            <Info className="h-5 w-5 text-blue-500" />
+            <CardTitle className="text-base text-blue-800">小额做市 (20U-100U) 建议</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* 核心概念 */}
-          <div className="space-y-3">
-            <h4 className="font-semibold flex items-center gap-2">
-              <ArrowLeftRight className="h-4 w-4 text-blue-500" />
-              核心概念：流动性提供者
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              做市商 (Market Maker) 是市场的流动性提供者。通过同时在买卖双方挂单，为市场提供流动性，
-              并赚取买卖价差 (Bid-Ask Spread) 作为补偿。做市商<strong>不预测方向</strong>，只赚取交易手续费。
+        <CardContent className="text-sm space-y-3">
+          <div className="grid gap-2">
+            <p className="text-muted-foreground">
+              <strong>✓ 适合的市场：</strong>中等热度政治事件、还有 10~60 天结束、价格在 45%-55% 区间
             </p>
-          </div>
-
-          {/* 做市流程 */}
-          <div className="space-y-3">
-            <h4 className="font-semibold flex items-center gap-2">
-              <ArrowRight className="h-4 w-4 text-green-500" />
-              做市操作流程
-            </h4>
-            <div className="grid gap-3">
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Badge variant="outline" className="mt-0.5">1</Badge>
-                <div>
-                  <p className="font-medium text-sm">计算中间价</p>
-                  <p className="text-xs text-muted-foreground">
-                    获取订单簿的最佳买价 (Bid) 和最佳卖价 (Ask)，计算中间价 midPrice = (Bid + Ask) / 2
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Badge variant="outline" className="mt-0.5">2</Badge>
-                <div>
-                  <p className="font-medium text-sm">双边挂单</p>
-                  <p className="text-xs text-muted-foreground">
-                    在中间价两侧挂单：买单价 = midPrice × (1 - spread/2)，卖单价 = midPrice × (1 + spread/2)
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <Badge variant="outline" className="mt-0.5 bg-green-100 text-green-700 border-green-300">3</Badge>
-                <div>
-                  <p className="font-medium text-sm text-green-800">赚取价差</p>
-                  <p className="text-xs text-green-700">
-                    当买单成交 (买入代币) 后卖单成交 (卖出代币)，赚取中间的价差。例如：$0.49 买入 → $0.51 卖出 = 赚 $0.02
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                <Badge variant="outline" className="mt-0.5">4</Badge>
-                <div>
-                  <p className="font-medium text-sm">持续刷新</p>
-                  <p className="text-xs text-muted-foreground">
-                    定期刷新报价，跟踪市场中间价变化，避免订单过于偏离市场价格
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 收益计算 */}
-          <div className="space-y-3">
-            <h4 className="font-semibold flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-purple-500" />
-              收益计算示例
-            </h4>
-            <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border font-mono text-sm space-y-2">
-              <p><span className="text-muted-foreground">// 设：价差 = 2%，订单量 = $10</span></p>
-              <p>买单价格 = $0.49，卖单价格 = $0.51</p>
-              <p>单次完整循环利润 = $10 × 2% = <span className="text-green-600">$0.20</span></p>
-              <p><span className="text-muted-foreground">// 假设每小时完成 5 次循环</span></p>
-              <p>时薪 = $0.20 × 5 = <span className="text-green-600">$1.00</span></p>
-            </div>
-          </div>
-
-          {/* 库存管理 */}
-          <div className="space-y-3">
-            <h4 className="font-semibold flex items-center gap-2">
-              <Scale className="h-4 w-4 text-orange-500" />
-              库存管理机制
-            </h4>
-            <div className="grid gap-3">
-              <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300 shrink-0">偏斜</Badge>
-                <div className="text-sm">
-                  <p className="font-medium text-orange-800">库存偏斜调整</p>
-                  <p className="text-xs text-orange-700 mt-1">
-                    当持仓偏向一侧（如 YES 过多）时，调整报价：降低 YES 买价、提高 YES 卖价，激励市场帮助减仓
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300 shrink-0">Merge</Badge>
-                <div className="text-sm">
-                  <p className="font-medium text-purple-800">自动 Merge 赎回</p>
-                  <p className="text-xs text-purple-700 mt-1">
-                    当同时持有 YES 和 NO 代币时，可调用 <code className="bg-purple-100 px-1 rounded">mergePositions</code> 
-                    合约，将一对代币赎回为 $1 USDC，释放资金
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 适用场景 */}
-          <div className="space-y-3">
-            <h4 className="font-semibold flex items-center gap-2">
-              <Info className="h-4 w-4 text-cyan-500" />
-              适用场景
-            </h4>
-            <ul className="text-sm text-muted-foreground space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="text-green-500">✓</span>
-                <span><strong>高流动性市场：</strong>交易活跃，订单容易成交</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-500">✓</span>
-                <span><strong>价格稳定市场：</strong>波动小，库存风险低</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-500">✓</span>
-                <span><strong>长期运行：</strong>需要持续在线监控和刷新订单</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-red-500">✗</span>
-                <span><strong>不适合：</strong>价格剧烈波动的市场，单边行情可能导致大额亏损</span>
-              </li>
-            </ul>
+            <p className="text-muted-foreground">
+              <strong>✓ 关键条件：</strong>每分钟 5+ 次成交、价差 ≥ 1.5%、深度中等、无高频机器人垄断
+            </p>
+            <p className="text-muted-foreground">
+              <strong>✗ 避免的市场：</strong>刚发布新闻、名人推文、社区热点、临近结算的市场
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -647,30 +797,18 @@ function MarketMakingConfigForm({
             <div className="flex items-start gap-2">
               <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 shrink-0">逆向选择</Badge>
               <p className="text-muted-foreground">
-                知情交易者可能利用你的报价进行套利，导致你的订单总是在不利时成交
+                知情交易者可能利用你的报价进行套利，导致订单总是在不利时成交
               </p>
             </div>
             <div className="flex items-start gap-2">
               <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 shrink-0">单边风险</Badge>
               <p className="text-muted-foreground">
-                市场单边行情时，只有一侧订单成交，导致持仓偏斜，亏损可能超过价差收益
-              </p>
-            </div>
-            <div className="flex items-start gap-2">
-              <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 shrink-0">资金锁定</Badge>
-              <p className="text-muted-foreground">
-                需要持续锁定资金用于挂单，资金利用效率可能低于其他策略
-              </p>
-            </div>
-            <div className="flex items-start gap-2">
-              <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 shrink-0">运维成本</Badge>
-              <p className="text-muted-foreground">
-                需要 24/7 在线运行，订单刷新消耗 Gas，网络中断可能导致订单过期
+                市场单边行情时，只有一侧订单成交，亏损可能超过价差收益
               </p>
             </div>
           </div>
           <p className="text-red-700 font-medium mt-4">
-            ⚠️ 强烈建议：小资金测试，设置严格持仓上限，选择稳定市场，充分了解风险后再启用
+            ⚠️ 强烈建议：小资金测试，设置严格持仓上限，选择稳定市场
           </p>
         </CardContent>
       </Card>

@@ -41,6 +41,13 @@ export const DEFAULT_QUEUE_CONFIGS: Record<QueueName, QueueConfig> = {
     timeout: 10000,
     backpressureThreshold: 0.8,
   },
+  price: {
+    name: 'price',
+    concurrency: 1,
+    maxSize: 1,
+    timeout: 600000, // 10 minutes
+    autoStart: false,
+  },
   mintSplit: {
     name: 'mintSplit',
     concurrency: 1,
@@ -72,7 +79,7 @@ export const DEFAULT_QUEUE_CONFIGS: Record<QueueName, QueueConfig> = {
 /**
  * 队列名称
  */
-export type QueueName = 'scan' | 'storage' | 'mintSplit' | 'arbitrage' | 'marketMaking' | 'order'
+export type QueueName = 'scan' | 'storage' | 'price' | 'mintSplit' | 'arbitrage' | 'marketMaking' | 'order'
 
 /**
  * 队列运行状态
@@ -201,7 +208,7 @@ export const DEFAULT_SCAN_CONFIG: ScanConfig = {
   closed: 'false',
   maxPages: 100,        // 最多 100 页，覆盖 20k 市场
   orderbookConcurrency: 20,
-  scanInterval: 300000, // 5分钟扫描一轮（减轻服务器压力）
+  scanInterval: 3600000, // 1小时扫描一轮
 }
 
 // ==================== 任务类型 ====================

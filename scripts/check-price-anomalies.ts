@@ -1,18 +1,14 @@
 /**
- * 检查 market_price_history 表中 outcome_prices 价格和不等于 1 的
+ * 检查 market_price_history 表中 outcome_prices 价格和不等于 1 的数据
  * 
  * 用法: npx ts-node scripts/check-price-anomalies.ts [选项]
  * 
  * 选项:
- *   --threshold=0.01   价格偏差阈值（默认 0.01，即 1%）
  *   --limit=100        最大显示条数（默认 100）
  * 
  * 示例:
- *   npm run check-price                           # 默认: 偏差>1%, 最多显示100条
- *   npm run check-price -- --threshold=0.005      # 偏差>0.5%
- *   npm run check-price -- --limit=50             # 最多显示50条
- *   npm run check-price -- --threshold=0.005 --limit=50  # 组合参数
- *   npm run check-price -- --threshold=0.0001 
+ *   npm run check-price                  # 显示价格和 ≠ 1 的记录，最多 100 条
+ *   npm run check-price -- --limit=50    # 最多显示 50 条
  */
 
 import mysql from 'mysql2/promise'
@@ -45,33 +41,27 @@ interface ParsedResult extends Omit<PriceHistoryRow, 'outcome_prices'> {
 }
 
 // 解析命令行参数
-function parseArgs(): { threshold: number; limit: number; days: number } {
+function parseArgs(): { limit: number } {
   const args = process.argv.slice(2)
-  let threshold = 0.01  // 默认 1% 偏差
   let limit = 100
-  let days = 7
 
   for (const arg of args) {
-    if (arg.startsWith('--threshold=')) {
-      threshold = parseFloat(arg.split('=')[1])
-    } else if (arg.startsWith('--limit=')) {
+    if (arg.startsWith('--limit=')) {
       limit = parseInt(arg.split('=')[1])
-    } else if (arg.startsWith('--days=')) {
-      days = parseInt(arg.split('=')[1])
     }
   }
 
-  return { threshold, limit, days }
+  return { limit }
 }
 
 async function checkPriceAnomalies() {
-  const { threshold, limit } = parseArgs()
+  const { limit } = parseArgs()
   
   console.log('='.repeat(60))
-  console.log('📊 市场价格异常检测脚本（全量扫描）')
+  console.log('📊 市场价格异常检测脚本（价格和 ≠ 1）')
   console.log('='.repeat(60))
   console.log(`配置:`)
-  console.log(`  - 偏差阈值: ${(threshold * 100).toFixed(2)}%`)
+  console.log(`  - 检测条件: 价格和 ≠ 1.0 (容差 0.00001)`)
   console.log(`  - 最大显示条数: ${limit}`)
   console.log('='.repeat(60))
   
@@ -128,11 +118,13 @@ async function checkPriceAnomalies() {
       }
       
       if (prices.length === 0) continue
-      
+
       const priceSum = prices.reduce((sum, p) => sum + p, 0)
       const deviation = Math.abs(priceSum - 1)
       
-      if (deviation > threshold) {
+      // 使用 0.00001 容差（小数点后 5 位）来避免浮点数精度问题
+      // 只要偏差超过 0.001%（即实际不等于 1）就记录
+      if (deviation > 0.00001) {
         anomalies.push({
           id: row.id,
           condition_id: row.condition_id,
@@ -153,7 +145,7 @@ async function checkPriceAnomalies() {
     const results = anomalies.slice(0, limit)
     
     if (results.length === 0) {
-      console.log(`\n✅ 未发现价格异常数据（偏差 > ${(threshold * 100).toFixed(2)}%）`)
+      console.log(`\n✅ 未发现价格异常数据（所有记录价格和都等于 1）`)
       console.log(`   已扫描 ${rows.length} 条记录`)
       return
     }

@@ -228,21 +228,6 @@ function MintSplitConfigForm({
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
-                        <div className="flex items-center gap-3">
-                            <Zap className="h-5 w-5 text-amber-600" />
-                            <div>
-                                <p className="font-medium text-amber-800">自动执行</p>
-                                <p className="text-sm text-amber-600">检测到机会时自动执行交易</p>
-                            </div>
-                        </div>
-                        <Switch
-                            checked={localConfig.autoExecute}
-                            onCheckedChange={(autoExecute) => updateField('autoExecute', autoExecute)}
-                        />
-                    </div>
-                </CardContent>
             </Card>
 
             {/* 触发条件 */}

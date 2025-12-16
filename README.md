@@ -115,8 +115,8 @@ npm run gen-creds
 # 检查钱包余额
 npm run check-balance
 
-# 检查价格历史表中价格和异常的数据
-npm run check-price -- --threshold=0.0001 
+# 检查价格历史表中价格不等于1的数据
+npm run check-price 
 ```
 
 ## 项目结构
@@ -223,3 +223,5 @@ ISC
 ---
 
 **免责声明**：使用风险自负。本软件按原样提供，不提供任何保证。始终先用小额测试。始终先用小额测试。
+
+

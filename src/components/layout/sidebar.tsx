@@ -11,7 +11,6 @@ import {
   TrendingUp,
   History,
   Wallet,
-  Settings,
   Bell,
   Key,
   User,
@@ -24,6 +23,7 @@ import {
   Database,
   Eye,
   Cog,
+  ListTodo,
 } from "lucide-react"
 
 interface NavItem {
@@ -52,6 +52,11 @@ const navigation: NavItem[] = [
     icon: Database,
     // badge: "新",
   },
+  {
+    title: "队列管理",
+    href: "/queues",
+    icon: ListTodo,
+  },
 
   {
     title: "策略",
@@ -70,11 +75,6 @@ const navigation: NavItem[] = [
       { title: "当前持仓", href: "/trades/positions", icon: Wallet },
       { title: "测试交易", href: "/trades/test", icon: TestTube, badge: "测试" },
     ],
-  },
-  {
-    title: "设置",
-    href: "/settings",
-    icon: Settings,
   },
 ]
 

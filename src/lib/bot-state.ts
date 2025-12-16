@@ -68,7 +68,7 @@ export const arbitrageState: ArbitrageState = {
 export const arbitrageSettings: ArbitrageSettings = {
   minSpread: parseFloat(process.env.ARB_MIN_SPREAD || "1.0"),
   tradeAmount: parseFloat(process.env.ARB_TRADE_AMOUNT || "10.0"),
-  scanInterval: parseInt(process.env.ARB_SCAN_INTERVAL || "60000"),
+  scanInterval: parseInt(process.env.ARB_SCAN_INTERVAL || "3600000"), // 1小时扫描一轮
   autoTrade: false,
   minVolumeFilter: parseFloat(process.env.ARB_MIN_VOLUME || "100"),
   minLiquidity: parseFloat(process.env.ARB_MIN_LIQUIDITY || "0"),
