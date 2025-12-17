@@ -80,6 +80,10 @@ RPC_URL=https://polygon-rpc.com
 
 ```bash
 npm run dev
+
+
+#检查价格波动
+cd /home/php/polymarket-trading-bot && npm run check-prices 2>/dev/null
 ```
 
 访问 http://localhost:3000 打开管理界面。
@@ -92,6 +96,9 @@ npm run build
 
 # 2. 首次启动（使用 PM2）
 pm2 start npm --name "polymarket-web" -- run start
+
+# 构建并上线
+npm run build && pm2 restart polymarket-web
 
 # 3. 后续更新部署
 git pull                        # 拉取最新代码

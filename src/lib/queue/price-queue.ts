@@ -37,12 +37,17 @@ class ClobPriceClient extends ApiClient {
    */
   async getPrice(tokenId: string, side: 'BUY' | 'SELL'): Promise<number | null> {
     try {
-      const response = await this.get<string>('/price', {
+      const response = await this.get<{ price: string }>('/price', {
         params: { token_id: tokenId, side },
       })
       
-      if (response.success && response.data) {
-        return parseFloat(response.data)
+      if (response.success && response.data && response.data.price) {
+        const price = parseFloat(response.data.price)
+        // 检查是否为有效数字，避免 NaN 进入数据库
+        if (isNaN(price) || !isFinite(price)) {
+          return null
+        }
+        return price
       }
       return null
     } catch (err) {
@@ -85,10 +90,10 @@ export interface PriceQueueConfig {
  * 默认价格队列配置
  */
 export const DEFAULT_PRICE_CONFIG: PriceQueueConfig = {
-  batchSize: 50,           // 每批 50 个市场
+  batchSize: 10,           // 每批 10 个 token
   tokenInterval: 100,      // 每个 token 间隔 100ms
-  batchInterval: 2000,     // 批次间隔 2s
-  scanInterval: 300000,    // 5 分钟一轮
+  batchInterval: 1000,     // 批次间隔 1s
+  scanInterval: 60000,     // 1 分钟一轮
   activeOnly: true,        // 只获取活跃市场
   minLiquidity: 100,       // 最小流动性 $100
 }
@@ -157,6 +162,7 @@ export interface PriceQueueStatus {
 /**
  * 价格队列
  * 从 markets 表获取 token_ids，调用 CLOB API 获取精确价格
+ * 连续循环模式：一轮完成后立即开始下一轮
  */
 export class PriceQueue {
   private queue: PQueue
@@ -167,7 +173,6 @@ export class PriceQueue {
   private errorCount = 0
   private lastTaskAt: Date | null = null
   private isScanning = false
-  private scanTimer: NodeJS.Timeout | null = null
   
   // 统计
   private stats = {
@@ -207,7 +212,8 @@ export class PriceQueue {
   // ==================== 生命周期 ====================
 
   /**
-   * 启动队列
+   * 启动队列 - 连续循环模式
+   * 一轮完成后立即开始下一轮
    */
   async start(): Promise<void> {
     if (this.state === 'running') {
@@ -216,13 +222,10 @@ export class PriceQueue {
     }
 
     this.state = 'running'
-    console.log('🚀 [PriceQueue] 价格队列已启动')
+    console.log('🚀 [PriceQueue] 价格队列已启动（连续循环模式）')
     
-    // 立即执行一次
-    await this.runScan()
-    
-    // 设置定时器
-    this.startScanTimer()
+    // 启动循环扫描
+    this.runContinuousLoop()
   }
 
   /**
@@ -230,7 +233,6 @@ export class PriceQueue {
    */
   async stop(): Promise<void> {
     this.state = 'stopped'
-    this.stopScanTimer()
     this.queue.pause()
     this.queue.clear()
     console.log('⏹️ [PriceQueue] 价格队列已停止')
@@ -241,7 +243,6 @@ export class PriceQueue {
    */
   pause(): void {
     this.state = 'paused'
-    this.stopScanTimer()
     this.queue.pause()
     console.log('⏸️ [PriceQueue] 价格队列已暂停')
   }
@@ -253,32 +254,33 @@ export class PriceQueue {
     if (this.state !== 'paused') return
     this.state = 'running'
     this.queue.start()
-    this.startScanTimer()
+    // 恢复后继续循环
+    this.runContinuousLoop()
     console.log('▶️ [PriceQueue] 价格队列已恢复')
   }
 
   // ==================== 扫描逻辑 ====================
 
   /**
-   * 启动扫描定时器
+   * 连续循环扫描
+   * 一轮完成后立即开始下一轮
    */
-  private startScanTimer(): void {
-    this.stopScanTimer()
-    this.scanTimer = setInterval(() => {
-      if (!this.isScanning && this.state === 'running') {
-        this.runScan()
+  private async runContinuousLoop(): Promise<void> {
+    while (this.state === 'running') {
+      try {
+        await this.runScan()
+        
+        // 短暂休息避免 CPU 占用过高
+        if (this.state === 'running') {
+          await this.sleep(1000) // 1 秒后开始下一轮
+        }
+      } catch (err) {
+        console.error('❌ [PriceQueue] 循环扫描出错:', err)
+        // 出错后等待 5 秒再重试
+        await this.sleep(5000)
       }
-    }, this.priceConfig.scanInterval)
-  }
-
-  /**
-   * 停止扫描定时器
-   */
-  private stopScanTimer(): void {
-    if (this.scanTimer) {
-      clearInterval(this.scanTimer)
-      this.scanTimer = null
     }
+    console.log('🔄 [PriceQueue] 循环已停止')
   }
 
   /**
@@ -312,11 +314,18 @@ export class PriceQueue {
       const markets = await this.getMarketsFromDb()
       this.stats.totalMarkets = markets.length
       
-      // 2. 提取所有 tokens
-      const tokens = this.extractTokens(markets)
+      // 2. 提取所有 tokens，并限制数量
+      let tokens = this.extractTokens(markets)
       this.stats.totalTokens = tokens.length
 
-      console.log(`📊 [PriceQueue] 获取到 ${markets.length} 个市场, ${tokens.length} 个 tokens`)
+      // 限制只获取前 N 个 token (batchSize 作为总限制)
+      const maxTokens = this.priceConfig.batchSize
+      if (tokens.length > maxTokens) {
+        console.log(`📊 [PriceQueue] 限制获取前 ${maxTokens} 个 tokens (共 ${tokens.length} 个)`)
+        tokens = tokens.slice(0, maxTokens)
+      }
+
+      console.log(`📊 [PriceQueue] 获取到 ${markets.length} 个市场, 处理 ${tokens.length} 个 tokens`)
 
       if (tokens.length === 0) {
         return {
@@ -533,31 +542,42 @@ export class PriceQueue {
    * 批量保存价格到数据库
    */
   private async savePrices(prices: PriceData[]): Promise<number> {
+    console.log(`📝 [PriceQueue] savePrices 收到 ${prices.length} 条数据`)
     if (prices.length === 0) return 0
 
     const pool = getPool()
     
-    // 使用 INSERT ... ON DUPLICATE KEY UPDATE
+    // 过滤掉无效数据（至少需要有 buyPrice 或 sellPrice）
+    const validPrices = prices.filter(p => {
+      // 检查必要字段
+      if (!p.conditionId || !p.tokenId) return false
+      // 至少需要一个有效价格
+      if (p.buyPrice === null && p.sellPrice === null) return false
+      // 确保数值字段不是 NaN
+      const hasNaN = [p.buyPrice, p.sellPrice, p.midPrice, p.spread, p.spreadPct]
+        .some(v => typeof v === 'number' && (isNaN(v) || !isFinite(v)))
+      return !hasNaN
+    })
+
+    if (validPrices.length === 0) {
+      console.log('⚠️ [PriceQueue] 没有有效价格数据可保存')
+      return 0
+    }
+
+    if (validPrices.length < prices.length) {
+      console.log(`⚠️ [PriceQueue] 过滤掉 ${prices.length - validPrices.length} 条无效数据`)
+    }
+    
+    // 使用 INSERT IGNORE 只插入新数据，忽略已存在的记录
     const sql = `
-      INSERT INTO market_prices 
+      INSERT IGNORE INTO market_prices 
         (condition_id, token_id, outcome, outcome_index, 
          buy_price, sell_price, mid_price, spread, spread_pct, fetched_at)
       VALUES ?
-      ON DUPLICATE KEY UPDATE
-        condition_id = VALUES(condition_id),
-        outcome = VALUES(outcome),
-        outcome_index = VALUES(outcome_index),
-        buy_price = VALUES(buy_price),
-        sell_price = VALUES(sell_price),
-        mid_price = VALUES(mid_price),
-        spread = VALUES(spread),
-        spread_pct = VALUES(spread_pct),
-        fetched_at = VALUES(fetched_at),
-        updated_at = CURRENT_TIMESTAMP
     `
 
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    const values = prices.map(p => [
+    const values = validPrices.map(p => [
       p.conditionId,
       p.tokenId,
       p.outcome,
@@ -571,8 +591,11 @@ export class PriceQueue {
     ])
 
     try {
+      console.log(`📝 [PriceQueue] 准备插入 ${values.length} 条数据`)
       const [result] = await pool.query(sql, [values])
-      return (result as any).affectedRows || 0
+      const affected = (result as any).affectedRows || 0
+      console.log(`📝 [PriceQueue] 插入完成, affectedRows: ${affected}`)
+      return affected
     } catch (err: any) {
       console.error('❌ [PriceQueue] 保存价格失败:', err.message)
       throw err
@@ -603,11 +626,6 @@ export class PriceQueue {
   updateConfig(config: Partial<PriceQueueConfig>): void {
     this.priceConfig = { ...this.priceConfig, ...config }
     console.log('⚙️ [PriceQueue] 配置已更新:', this.priceConfig)
-    
-    // 如果正在运行，重启定时器
-    if (this.state === 'running') {
-      this.startScanTimer()
-    }
   }
 
   // ==================== 工具方法 ====================
@@ -623,10 +641,15 @@ let priceQueueInstance: PriceQueue | null = null
 
 /**
  * 获取价格队列单例
+ * 首次调用时自动启动队列
  */
 export function getPriceQueue(): PriceQueue {
   if (!priceQueueInstance) {
     priceQueueInstance = new PriceQueue()
+    // 自动启动队列（异步执行，不阻塞）
+    priceQueueInstance.start().catch(err => {
+      console.error('❌ [PriceQueue] 自动启动失败:', err)
+    })
   }
   return priceQueueInstance
 }

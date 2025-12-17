@@ -153,6 +153,7 @@ export {
 
 import { getScanQueue, resetScanQueue } from './scan-queue'
 import { getStorageQueue, resetStorageQueue } from './storage-queue'
+import { getPriceQueue, resetPriceQueue } from './price-queue'
 import { getStrategyDispatcher, resetStrategyDispatcher } from './strategy-dispatcher'
 import { getMintSplitQueue, resetMintSplitQueue } from './strategies/mint-split-queue'
 import { getArbitrageQueue, resetArbitrageQueue } from './strategies/arbitrage-queue'
@@ -222,9 +223,10 @@ export async function stopQueueSystem(): Promise<void> {
 /**
  * 重置队列系统 (用于测试)
  */
-export function resetQueueSystem(): void {
+export async function resetQueueSystem(): Promise<void> {
   resetScanQueue()
   resetStorageQueue()
+  await resetPriceQueue()
   resetStrategyDispatcher()
   resetMintSplitQueue()
   resetArbitrageQueue()
@@ -279,7 +281,10 @@ export function initStrategyQueueSystem() {
   // 4. 初始化执行队列
   const orderQueue = getOrderQueue()
   
-  // 5. 注册策略处理器
+  // 5. 初始化价格队列（自动启动循环扫描）
+  const priceQueue = getPriceQueue()
+  
+  // 6. 注册策略处理器
   dispatcher.registerHandler('MINT_SPLIT', async (task) => {
     await mintSplitQueue.handleTask(task)
   })
@@ -292,7 +297,7 @@ export function initStrategyQueueSystem() {
     await marketMakingQueue.handleTask(task)
   })
   
-  // 6. 连接扫描 → 策略分发 + 存储队列 (流水线模式: 每页200条立即分发)
+  // 7. 连接扫描 → 策略分发 + 存储队列 (流水线模式: 每页200条立即分发)
   scanQueue.setOnMarketsScanned(async (markets) => {
     // 存储到数据库
     await storageQueue.add(markets)
@@ -301,7 +306,7 @@ export function initStrategyQueueSystem() {
     await dispatcher.analyze(markets)
   })
 
-  // 7. 设置等待队列空闲的回调 (流水线模式核心)
+  // 8. 设置等待队列空闲的回调 (流水线模式核心)
   scanQueue.setWaitForQueuesIdle(async () => {
     // 等待存储队列处理完成
     await storageQueue.waitUntilIdle()
@@ -315,7 +320,7 @@ export function initStrategyQueueSystem() {
     await orderQueue.waitUntilIdle()
   })
   
-  console.log('✅ [QueueSystem] 策略队列系统已初始化（流水线模式）')
+  console.log('✅ [QueueSystem] 策略队列系统已初始化（含价格队列，流水线模式）')
   
   return {
     scanQueue,
@@ -325,5 +330,6 @@ export function initStrategyQueueSystem() {
     arbitrageQueue,
     marketMakingQueue,
     orderQueue,
+    priceQueue,
   }
 }

@@ -10,7 +10,8 @@
     "lint": "next lint",
     "gen-creds": "npx ts-node server/generate_credentials.ts",
     "check-balance": "npx ts-node server/check_balance.ts",
-    "check-price": "npx ts-node scripts/check-price-anomalies.ts"
+    "check-price": "npx ts-node scripts/check-price-anomalies.ts",
+    "check-prices": "npx ts-node scripts/check-market-prices.ts"
   },
   "dependencies": {
     "@ethersproject/providers": "^5.8.0",

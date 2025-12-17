@@ -57,9 +57,24 @@ function toMarketData(market: GammaMarket): MarketData {
     )
   }
 
-  // 解析 tokens 获取 clobTokenIds
+  // 解析 clobTokenIds（可能是 JSON 字符串或数组）
   let clobTokenIds: string[] | undefined
-  if (Array.isArray(market.tokens)) {
+  const rawClobTokenIds = (market as any).clobTokenIds
+  if (rawClobTokenIds) {
+    if (typeof rawClobTokenIds === 'string') {
+      // API 返回 JSON 字符串，需要解析
+      try {
+        clobTokenIds = JSON.parse(rawClobTokenIds)
+      } catch {
+        clobTokenIds = undefined
+      }
+    } else if (Array.isArray(rawClobTokenIds)) {
+      clobTokenIds = rawClobTokenIds
+    }
+  }
+  
+  // 备选：从 tokens 字段获取（旧格式）
+  if (!clobTokenIds && Array.isArray(market.tokens)) {
     clobTokenIds = market.tokens.map(t => t.token_id)
   }
 

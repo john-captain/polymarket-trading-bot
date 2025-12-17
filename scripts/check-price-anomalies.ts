@@ -9,6 +9,10 @@
  * 示例:
  *   npm run check-price                  # 显示价格和 ≠ 1 的记录，最多 100 条
  *   npm run check-price -- --limit=50    # 最多显示 50 条
+ * 
+ * npm run check-prices                    # 检测偏差 > 1% 的套利机会
+npm run check-prices -- --min-dev=0.005 # 检测偏差 > 0.5% 的套利机会
+npm run check-prices -- --min-dev=0.001 # 检测偏差 > 0.1% 的套利机会
  */
 
 import mysql from 'mysql2/promise'
